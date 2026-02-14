@@ -26,32 +26,97 @@
     document.body.appendChild(root);
 
     document.getElementById('yta-analyze').addEventListener('click', () => {
-        const status = document.getElementById('yta-status');
-        status.textContent = 'Sending...';
+        try {
+            const status = document.getElementById('yta-status');
 
-        chrome.runtime.sendMessage({ type: 'ANALYZE_VIDEO', videoUrl: window.location.href }, (response) => {
-            if (!response) {
-                status.textContent = 'No response from background.';
-                return;
+            // Extract canonical watch link (youtube.com/watch?v=VIDEO_ID)
+            var videoLink = window.location.href;
+            try {
+                const url = new URL(window.location.href);
+                console.log('Extracted window location:', videoLink);
+
+                const v = url.searchParams.get('v');
+                if (v) {
+                    videoLink = `https://www.youtube.com/watch?v=${v}`;
+                }
+            } catch (e) {
+                // If URL parsing fails, fall back to full href
+                videoLink = window.location.href;
             }
-            if (response.success) {
-                status.textContent = 'Analysis complete';
-                const metrics = response.data;
-                const metricsEl = document.getElementById('yta-metrics');
-                metricsEl.innerHTML = '';
-                ['engagement_score', 'misinformation_score', 'quality_score'].forEach(k => {
-                    if (metrics[k] !== undefined) {
-                        metricsEl.innerHTML += `<div style="margin-bottom:6px">
-              <div style="font-size:12px">${k.replace('_', ' ')}: ${metrics[k]}</div>
-              <div style="background:#444;height:8px;border-radius:4px">
-                <div style="width:${Math.round(metrics[k] * 100)}%;height:8px;background:#4caf50;border-radius:4px"></div>
-              </div>
-            </div>`;
+
+            // Log the extracted link for debugging
+            console.log('Extracted video link for analysis:', videoLink);
+
+            status.textContent = 'Sending...';
+
+            // Send message to extension background/service worker in a runtime-compatible way
+            (function sendRuntimeMessage(message, callback) {
+                try {
+                    // Prefer chrome.runtime (Chromium-based browsers)
+                    if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
+                        try {
+                            // Some implementations accept a callback, others return a Promise.
+                            const result = chrome.runtime.sendMessage(message, callback);
+                            // If a Promise is returned and no callback was provided, attach handlers to avoid unhandled rejection
+                            if (result && typeof result.then === 'function' && !callback) {
+                                result.then(() => { }).catch(err => console.error('Background sendMessage promise rejected:', err));
+                            }
+                            return;
+                        } catch (e) {
+                            // fallback below
+                            console.warn('chrome.runtime.sendMessage threw, trying browser.runtime if available', e);
+                        }
                     }
-                });
-            } else {
-                status.textContent = 'Error: ' + (response.error || 'Unknown');
-            }
-        });
+
+                    // Support Firefox-style browser.runtime that returns a Promise
+                    if (typeof browser !== 'undefined' && browser.runtime && typeof browser.runtime.sendMessage === 'function') {
+                        const p = browser.runtime.sendMessage(message);
+                        if (callback && p && typeof p.then === 'function') {
+                            p.then(callback).catch(err => {
+                                console.error('browser.runtime.sendMessage rejected:', err);
+                                callback(null);
+                            });
+                        }
+                        return;
+                    }
+
+                    console.error('No extension runtime available to send message');
+                    if (typeof callback === 'function') callback(null);
+                } catch (err) {
+                    console.error('sendRuntimeMessage error:', err);
+                    if (typeof callback === 'function') callback(null);
+                }
+            })({ type: 'ANALYZE_VIDEO', videoUrl: videoLink }, (response) => {
+                try {
+                    if (!response) {
+                        status.textContent = 'No response from background.';
+                        return;
+                    }
+                    if (response.success) {
+                        status.textContent = 'Analysis complete';
+                        const metrics = response.data;
+                        const metricsEl = document.getElementById('yta-metrics');
+                        metricsEl.innerHTML = '';
+                        ['engagement_score', 'misinformation_score', 'quality_score'].forEach(k => {
+                            if (metrics[k] !== undefined) {
+                                metricsEl.innerHTML += `<div style="margin-bottom:6px">
+                  <div style="font-size:12px">${k.replace('_', ' ')}: ${metrics[k]}</div>
+                  <div style="background:#444;height:8px;border-radius:4px">
+                    <div style="width:${Math.round(metrics[k] * 100)}%;height:8px;background:#4caf50;border-radius:4px"></div>
+                  </div>
+                </div>`;
+                            }
+                        });
+                    } else {
+                        status.textContent = 'Error: ' + (response.error || 'Unknown');
+                    }
+                } catch (innerErr) {
+                    console.error('Error handling analyze response:', innerErr, innerErr.stack);
+                    status.textContent = 'Error processing response';
+                }
+            });
+        } catch (err) {
+            console.error('Analyze click handler error:', err, err && err.stack);
+        }
     });
 })();
