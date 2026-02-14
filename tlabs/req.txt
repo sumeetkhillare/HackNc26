@@ -1,0 +1,10 @@
+# Requirements for YouTube to TwelveLabs Pipeline
+
+# Alternative: Raw requests approach
+requests==2.31.0
+
+# Optional: Progress bars
+tqdm==4.66.1
+
+# Optional: Better logging
+colorama==0.4.6
