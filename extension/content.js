@@ -18,14 +18,14 @@
     root.innerHTML = `
     <div id="yta-ui">
       <button id="yta-analyze">Analyze</button>
-      <div id="yta-status"></div>
+      <div id="credibility-score"></div>
       <div id="yta-metrics" style="margin-top:8px"></div>
     </div>
   `;
 
     requestAnimationFrame(() => {
         // NOW the element exists
-        const container = root.querySelector("#yta-status");
+        const container = root.querySelector("#credibility-score");
         container.style.margin = "20px";
         container.style.width = "180px";
         container.style.height = "100px";
@@ -69,7 +69,7 @@
 
     document.getElementById('yta-analyze').addEventListener('click', () => {
         try {
-            const status = document.getElementById('yta-status');
+            const status = document.getElementById('credibility-score');
 
             // Extract canonical watch link (youtube.com/watch?v=VIDEO_ID)
             var videoLink = window.location.href;
