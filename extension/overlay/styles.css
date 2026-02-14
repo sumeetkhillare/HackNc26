@@ -36,3 +36,9 @@
     color: #ff8080;
     margin-top: 8px;
 }
+
+#yta-status {
+    margin: 20px;
+    width: 200px;
+    height: 100px;
+}

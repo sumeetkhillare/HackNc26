@@ -18,10 +18,52 @@
     root.innerHTML = `
     <div id="yta-ui">
       <button id="yta-analyze">Analyze</button>
-      <div id="yta-status" style="margin-top:8px;font-size:12px"></div>
+      <div id="yta-status"></div>
       <div id="yta-metrics" style="margin-top:8px"></div>
     </div>
   `;
+
+    requestAnimationFrame(() => {
+        // NOW the element exists
+        const container = root.querySelector("#yta-status");
+        container.style.margin = "20px";
+        container.style.width = "180px";
+        container.style.height = "100px";
+        console.log('Container for progress bar:', document.body.contains(container));
+        console.log(ProgressBar);
+
+        var bar = new ProgressBar.SemiCircle(container, {
+            strokeWidth: 6,
+            color: '#FFEA82',
+            trailColor: '#eee',
+            trailWidth: 1,
+            easing: 'easeInOut',
+            duration: 1400,
+            svgStyle: null,
+            text: {
+                value: '',
+                alignToBottom: false
+            },
+            from: { color: '#FFEA82' },
+            to: { color: '#ED6A5A' },
+            // Set default step function for all animate calls
+            step: (state, bar) => {
+                bar.path.setAttribute('stroke', state.color);
+                var value = Math.round(bar.value() * 100);
+                if (value === 0) {
+                    bar.setText('');
+                } else {
+                    bar.setText(value);
+                }
+
+                bar.text.style.color = state.color;
+            }
+        });
+        bar.text.style.fontFamily = '"Raleway", Helvetica, sans-serif';
+        bar.text.style.fontSize = '2rem';
+
+        bar.animate(1.0);  // Number from 0.0 to 1.0
+    });
 
     document.body.appendChild(root);
 
