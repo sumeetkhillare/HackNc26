@@ -1,0 +1,38 @@
+.yta-overlay {
+    font-family: Arial, Helvetica, sans-serif;
+    color: #fff;
+}
+
+.yta-overlay button {
+    background: #1e88e5;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.yta-overlay .metrics {
+    margin-top: 8px;
+}
+
+.yta-overlay .metric {
+    margin-bottom: 8px;
+}
+
+.yta-overlay .bar {
+    background: #333;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.yta-overlay .bar-fill {
+    height: 8px;
+    background: #4caf50;
+}
+
+.error {
+    color: #ff8080;
+    margin-top: 8px;
+}

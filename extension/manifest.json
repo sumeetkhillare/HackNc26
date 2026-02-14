@@ -1,0 +1,31 @@
+{
+    "manifest_version": 3,
+    "name": "YouTube Video Analysis",
+    "version": "0.1.0",
+    "description": "Overlay UI to analyze YouTube videos via external backend",
+    "permissions": [
+        "activeTab",
+        "scripting",
+        "storage"
+    ],
+    "host_permissions": [
+        "https://your-backend.com/*"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://www.youtube.com/*"
+            ],
+            "js": [
+                "content.js"
+            ],
+            "run_at": "document_idle"
+        }
+    ],
+    "action": {
+        "default_title": "YouTube Analyzer"
+    }
+}
