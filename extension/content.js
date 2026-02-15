@@ -895,8 +895,8 @@
                         }
                         
                         // Load tags
-                        if (data.tags && data.tags.length > 0) {
-                            renderTags(data.tags);
+                        if (data.content_tags && data.content_tags.length > 0) {
+                            renderTags(data.content_tags);
                             document.getElementById('tags-section').style.display = 'block';
                         }
                         
