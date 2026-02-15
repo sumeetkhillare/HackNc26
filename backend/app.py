@@ -152,7 +152,7 @@ def analyze_twelve_labs():
         print(f"Returning cached analysis for {db_id}")
         # cached_result = valkey_get(valkey_key)
         try:
-            return jsonify(json.loads(cached_result)), 200
+            return jsonify(cached_result), 200
         except json.JSONDecodeError:
             return jsonify({"error": "Cached analysis is corrupted"}), 500
 
@@ -356,4 +356,4 @@ def fact_check_video():
 
 if __name__ == '__main__':
     # Run the server
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5002)
