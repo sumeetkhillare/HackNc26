@@ -112,6 +112,8 @@ def download_and_extract(video_url):
                 
                 # Save the structured tree
                 simple_data['comments'] = root_comments
+            else:
+                simple_data['comments'] = []
 
             # C. Save the Simple Data to a clean JSON file
             # We save this as 'VIDEO_ID_summary.json' inside the folder

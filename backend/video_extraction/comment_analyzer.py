@@ -61,17 +61,28 @@ class CommentAnalyzer:
     def _format_transcript_context(self, transcript_data: Dict[str, Any]) -> str:
         """Extracts summaries from the segmented transcript JSON"""
         if not transcript_data or 'segments' not in transcript_data:
-            return "No transcript context available."
+            return "No transcript context available (Video likely has no subtitles)."
+
+        segments = transcript_data.get('segments', [])
+        
+        # EDGE CASE: File exists but has no segments (Empty VTT)
+        if not segments:
+            return "Transcript is empty (No dialogue detected)."
 
         context_str = "VIDEO TRANSCRIPT SUMMARY (Timeline):\n"
-        for seg in transcript_data.get('segments', []):
+        for seg in segments:
             time_range = seg.get('timestamps', {}).get('display', 'Unknown')
-            # Handle cases where analysis might have failed
             analysis = seg.get('analysis', {})
-            summary = analysis.get('summary', 'No summary provided.')
-            topic = analysis.get('topic', 'Topic Unknown')
             
-            context_str += f"- [{time_range}] {topic}: {summary}\n"
+            # EDGE CASE: Handle fallback summary from Segmenter failure
+            topic = analysis.get('topic', 'Topic Unknown')
+            summary = analysis.get('summary', 'No summary provided.')
+            
+            # Skip if the segment failed to analyze effectively to reduce noise in prompt
+            if topic == "Analysis Unavailable":
+                context_str += f"- [{time_range}] [Raw Text Available, Analysis Failed]\n"
+            else:
+                context_str += f"- [{time_range}] {topic}: {summary}\n"
         
         return context_str
 
