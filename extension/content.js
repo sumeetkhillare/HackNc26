@@ -4,86 +4,6 @@
     if (!window.location.href.includes('watch')) return;
     if (document.getElementById('yta-overlay-root')) return;
 
-    // ==================== MOCK DATA - REPLACE WITH BACKEND DATA ====================
-    const MOCK_DATA = {
-        // Core metrics
-        credibility_score: 0.75,
-        clickbait_score: 35, // 0-100
-        
-        // Sentiment (from backend: sentiment_counts)
-        sentiment_counts: {
-            positive: 55,
-            negative: 25,
-            neutral: 13
-        },
-        
-        // Engagement (from backend: engagement_metrics)
-        engagement_metrics: {
-            engagement_score: 92, // 0-100 scale
-            bot_activity_percentage: 2
-        },
-        
-        // Community insights (from backend: community_insights)
-        community_insights: {
-            dominant_topic: "The dynamic between host Dylan and editor Alex, interspersed with reactions to the Epstein files and the school shooter's identity.",
-            controversy_level: "High" // Low, Medium, High
-        },
-        
-        // Community vibe (from backend: summary_of_vibe)
-        summary_of_vibe: "The audience is deeply invested in the channel's meta-humor, specifically praising the editor Alex and participating in 'Petition' memes. While the news content regarding Epstein and the school shooting sparks intense and often polarized debate, the core community remains highly supportive of the creator's personality and production style.",
-        
-        // Existing fields
-        fact_checks: [
-            {
-                claim: "The Earth orbits around the Sun",
-                verdict: "true",
-                explanation: "This is scientifically verified and has been proven through astronomical observations."
-            },
-            {
-                claim: "5G networks cause health problems",
-                verdict: "false",
-                explanation: "Multiple scientific studies have found no evidence linking 5G to health issues."
-            },
-            {
-                claim: "Coffee is healthy for everyone",
-                verdict: "partial",
-                explanation: "Coffee has health benefits for most people, but can be harmful for those with certain conditions."
-            }
-        ],
-        key_insights: [
-            { text: "Video demonstrates high production quality with professional editing", severity: "positive" },
-            { text: "Content creator has established credibility in this topic area", severity: "positive" },
-            { text: "Some claims lack supporting sources or citations", severity: "caution" },
-            { text: "Engagement metrics suggest authentic audience interaction", severity: "positive" },
-            { text: "Video contains one potentially misleading statement about statistics", severity: "negative" },
-            { text: "Channel has a history of accurate reporting", severity: "positive" },
-            { text: "Viewer discretion advised for sensitive content", severity: "caution" }
-        ],
-        alternative_perspectives: [
-            {
-                source: "BBC News",
-                type: "Mainstream Media Perspective",
-                description: "Covers similar topic with emphasis on expert analysis and peer-reviewed studies.",
-                url: "https://bbc.com/news/example"
-            },
-            {
-                source: "Scientific American",
-                type: "Academic Perspective",
-                description: "Provides in-depth scientific analysis with citations from recent research publications.",
-                url: "https://scientificamerican.com/article/example"
-            },
-            {
-                source: "The Guardian",
-                type: "Investigative Journalism",
-                description: "Investigative piece exploring counter-arguments and alternative viewpoints on this topic.",
-                url: "https://theguardian.com/article/example"
-            }
-        ],
-        misinformation_score: 0.3,
-        quality_score: 0.9
-    };
-    // ==================== END MOCK DATA ====================
-
     // Add custom scrollbar styles
     const styleSheet = document.createElement('style');
     styleSheet.textContent = `
@@ -140,7 +60,7 @@
     root.style.color = '#fff';
     root.style.padding = '16px';
     root.style.borderRadius = '12px';
-    root.style.width = '1080px';  // Default width
+    root.style.width = '380px';  // Default width
     root.style.maxHeight = 'calc(100vh - 100px)';
     root.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
     root.style.fontFamily = 'Arial, sans-serif';
@@ -235,6 +155,34 @@
         
         <!-- Clear Analysis Button - Hidden by default -->
         <button id="yta-clear">Clear Analysis</button>
+        
+        <!-- Tags Section - MOVED TO TOP -->
+        <div id="tags-section" style="margin-top: 16px; display: none;">
+          <div style="
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+          ">Video Tags</div>
+          <div id="tags-content">
+            <!-- Will be populated dynamically -->
+          </div>
+        </div>
+        
+        <!-- Summary Section - NEW, RIGHT BELOW TAGS -->
+        <div id="summary-section" style="margin-top: 16px; display: none;">
+          <div style="
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+          ">Video Summary</div>
+          <div id="summary-content">
+            <!-- Will be populated dynamically -->
+          </div>
+        </div>
         
         <!-- Credibility Score Section - Hidden by default -->
         <div id="credibility-score-section" style="display: none;">
@@ -415,20 +363,6 @@
           </div>
         </div>
         
-        <!-- Tags Section -->
-        <div id="tags-section" style="margin-top: 16px; display: none;">
-          <div style="
-            font-weight: bold;
-            font-size: 14px;
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid rgba(255,255,255,0.2);
-          ">Video Tags</div>
-          <div id="tags-content">
-            <!-- Will be populated dynamically -->
-          </div>
-        </div>
-        
         <div id="yta-metrics" style="margin-top:16px; padding-bottom: 16px;"></div>
       </div>
     </div>
@@ -456,7 +390,7 @@
             to: { color: '#ED6A5A' },
             step: (state, bar) => {
                 bar.path.setAttribute('stroke', state.color);
-                var value = Math.round(bar.value());
+                var value = Math.round(bar.value() * 100);
                 if (value === 0) {
                     bar.setText('');
                 } else {
@@ -469,7 +403,7 @@
         bar.text.style.fontSize = '2rem';
 
         window.ytaProgressBar = bar;
-        bar.animate(1.0);
+        bar.animate(0.0);
     });
 
     document.body.appendChild(root);
@@ -488,25 +422,21 @@
         }
     }, { passive: true });
 
-    // Width control functionality - FIXED VERSION
+    // Width control functionality
     const increaseBtn = document.getElementById('yta-increase');
     const decreaseBtn = document.getElementById('yta-decrease');
     
-    // Simple step size
     const STEP_SIZE = 200;
     const MIN_WIDTH = 320;
     
-    // Get max width based on viewport
     function getMaxWidth() {
         return window.innerWidth - 40;
     }
     
-    // Update button states based on current width
     function updateButtonStates() {
         const currentWidth = parseInt(root.style.width) || 380;
         const maxWidth = getMaxWidth();
         
-        // Update decrease button
         if (currentWidth <= MIN_WIDTH) {
             decreaseBtn.disabled = true;
             decreaseBtn.style.opacity = '0.3';
@@ -517,7 +447,6 @@
             decreaseBtn.style.cursor = 'pointer';
         }
         
-        // Update increase button
         if (currentWidth >= maxWidth) {
             increaseBtn.disabled = true;
             increaseBtn.style.opacity = '0.3';
@@ -529,7 +458,6 @@
         }
     }
     
-    // Set width and update buttons
     function setWidth(newWidth) {
         const maxWidth = getMaxWidth();
         const finalWidth = Math.min(Math.max(newWidth, MIN_WIDTH), maxWidth);
@@ -537,57 +465,40 @@
         updateButtonStates();
     }
     
-    // Increase width
     increaseBtn.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
-        
         if (this.disabled) return;
-        
         const currentWidth = parseInt(root.style.width) || 380;
         const newWidth = currentWidth + STEP_SIZE;
-        
-        console.log('Increase: current=' + currentWidth + ', new=' + newWidth);
         setWidth(newWidth);
     });
     
-    // Decrease width
     decreaseBtn.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
-        
         if (this.disabled) return;
-        
         const currentWidth = parseInt(root.style.width) || 380;
         const newWidth = currentWidth - STEP_SIZE;
-        
-        console.log('Decrease: current=' + currentWidth + ', new=' + newWidth);
         setWidth(newWidth);
     });
     
-    // Initialize
     setWidth(380);
     
-    // Button hover effects
     increaseBtn.addEventListener('mouseenter', function() {
-        if (!this.disabled) {
-            this.style.background = 'rgba(255,255,255,0.2)';
-        }
+        if (!this.disabled) this.style.background = 'rgba(255,255,255,0.2)';
     });
     increaseBtn.addEventListener('mouseleave', function() {
         this.style.background = 'rgba(255,255,255,0.1)';
     });
     
     decreaseBtn.addEventListener('mouseenter', function() {
-        if (!this.disabled) {
-            this.style.background = 'rgba(255,255,255,0.2)';
-        }
+        if (!this.disabled) this.style.background = 'rgba(255,255,255,0.2)';
     });
     decreaseBtn.addEventListener('mouseleave', function() {
         this.style.background = 'rgba(255,255,255,0.1)';
     });
     
-    // Update on window resize
     window.addEventListener('resize', function() {
         const currentWidth = parseInt(root.style.width) || 380;
         setWidth(currentWidth);
@@ -595,14 +506,13 @@
 
     // Minimize/Maximize functionality
     let isMinimized = false;
-    let previousWidth = 380; // Store previous width
+    let previousWidth = 380;
     const minimizeBtn = document.getElementById('yta-minimize');
     
     minimizeBtn.addEventListener('click', () => {
         isMinimized = !isMinimized;
         
         if (isMinimized) {
-            // Store current width before minimizing
             previousWidth = parseInt(root.style.width) || 380;
             contentDiv.style.display = 'none';
             minimizeBtn.textContent = '+';
@@ -614,7 +524,6 @@
             minimizeBtn.textContent = '−';
             minimizeBtn.title = 'Minimize';
             root.style.padding = '16px';
-            // Restore previous width with button state update
             setWidth(previousWidth);
         }
     });
@@ -640,16 +549,12 @@
             const analyzeBtn = document.getElementById('yta-analyze');
             const clearBtn = document.getElementById('yta-clear');
 
-            // Hide clear button during analysis
             clearBtn.style.display = 'none';
-
-            // Disable button and show loading state
             analyzeBtn.disabled = true;
             analyzeBtn.style.opacity = '0.6';
             analyzeBtn.style.cursor = 'not-allowed';
             analyzeBtn.textContent = 'Analyzing...';
             
-            // Show loading spinner in metrics area
             metricsEl.innerHTML = `
                 <div style="text-align:center;padding:20px;">
                     <div style="
@@ -688,10 +593,8 @@
 
             console.log('Extracted video link for analysis:', videoLink);
 
-            // ==================== STEP 1: EXTRACT VIDEO INFO ====================
             extractVideoInfo(videoLink, (extractionResponse) => {
                 if (!extractionResponse || !extractionResponse.success) {
-                    // Extraction failed - show error and stop
                     const errorMsg = extractionResponse?.error || 'Video extraction failed';
                     console.error('Video extraction error:', errorMsg);
                     
@@ -712,7 +615,6 @@
                         </div>
                     `;
                     
-                    // Re-enable button
                     analyzeBtn.disabled = false;
                     analyzeBtn.style.opacity = '1';
                     analyzeBtn.style.cursor = 'pointer';
@@ -720,16 +622,12 @@
                     return;
                 }
                 
-                // Extraction succeeded - get video_id
                 const videoId = extractionResponse.data.video_id;
                 console.log('Video extraction successful. Video ID:', videoId);
-                
-                // ==================== STEP 2: RUN 3 INDEPENDENT ASYNC API CALLS ====================
                 
                 let completedCalls = 0;
                 let totalCalls = 3;
                 
-                // Helper to update loading message
                 function updateLoadingMessage(message) {
                     const loadingDiv = metricsEl.querySelector('div[style*="margin-top: 12px"]');
                     if (loadingDiv) {
@@ -737,38 +635,28 @@
                     }
                 }
                 
-                // Helper to check if all calls completed
                 function checkCompletion() {
                     completedCalls++;
                     console.log(`API call completed (${completedCalls}/${totalCalls})`);
                     if (completedCalls === totalCalls) {
-                        // Hide analyze button
                         analyzeBtn.style.display = 'none';
-                        
-                        // Show clear button
                         clearBtn.style.display = 'block';
-                        
-                        // Update metrics message
                         metricsEl.innerHTML = '<div style="text-align:center;padding:12px;font-size:12px;opacity:0.7">✓ Analysis complete</div>';
-                        
                         console.log('All analyses completed successfully');
                     }
                 }
                 
-                // Launch all 3 API calls immediately (in parallel)
                 console.log('Launching 3 parallel API calls...');
                 
-                // API CALL 1: Comments Analysis (sentiment, engagement, community insights)
+                // API CALL 1: Comments Analysis
                 console.log('[PARALLEL] Starting Comments Analysis...');
                 updateLoadingMessage('Analyzing comments...');
                 sendCommentsAnalysisRequest(videoId, (response) => {
                     console.log('[PARALLEL] Comments Analysis response received');
                     if (response && response.success) {
-                        // NEW FORMAT: Data is nested under 'analysis' key
                         const data = response.data.analysis || response.data;
                         console.log('Comments analysis received:', data);
                         
-                        // Load sentiment counts
                         if (data.sentiment_counts) {
                             updateCommentsAnalysis(
                                 data.sentiment_counts.positive || 0,
@@ -778,14 +666,12 @@
                             document.getElementById('comments-analysis-section').style.display = 'block';
                         }
                         
-                        // Load engagement metrics
                         if (data.engagement_metrics) {
                             metricsEl.innerHTML = '';
                             
-                            // engagement_score is already 0-100, no need to divide
                             const engagementScore = data.engagement_metrics.engagement_score;
                             const percentage = Math.round(engagementScore);
-                            const scoreForColor = engagementScore / 100; // Convert to 0-1 for color function
+                            const scoreForColor = engagementScore / 100;
                             
                             metricsEl.innerHTML += `
                             <div style="margin-bottom:10px">
@@ -815,13 +701,11 @@
                             }
                         }
                         
-                        // Load community insights
                         if (data.community_insights) {
                             renderCommunityInsights(data.community_insights);
                             document.getElementById('community-insights-section').style.display = 'block';
                         }
                         
-                        // Load community vibe
                         if (data.summary_of_vibe) {
                             renderCommunityVibe(data.summary_of_vibe);
                             document.getElementById('community-vibe-section').style.display = 'block';
@@ -837,23 +721,19 @@
                 sendAnalysisRequest('ANALYZE_FACTS', videoId, (response) => {
                     console.log('[PARALLEL] Facts Analysis response received');
                     if (response && response.success) {
-                        // NEW FORMAT: Data is nested under 'analysis' key
                         const data = response.data.analysis || response.data;
                         console.log('Fact-check analysis received:', data);
                         
-                        // Load fact checks
                         if (data.fact_checks && data.fact_checks.length > 0) {
                             renderFactChecks(data.fact_checks);
                             document.getElementById('fact-check-section').style.display = 'block';
                         }
                         
-                        // Load alternative perspectives
                         if (data.alternative_perspectives && data.alternative_perspectives.length > 0) {
                             renderAlternativePerspectives(data.alternative_perspectives);
                             document.getElementById('alternative-perspectives-section').style.display = 'block';
                         }
                         
-                        // Load bias distribution
                         if (data.bias_distribution) {
                             renderBiasDistribution(data.bias_distribution);
                             document.getElementById('bias-distribution-section').style.display = 'block';
@@ -864,7 +744,7 @@
                     checkCompletion();
                 });
                 
-                // API CALL 3: Quality Metrics (credibility, clickbait, key insights, etc.)
+                // API CALL 3: Quality Metrics
                 console.log('[PARALLEL] Starting Quality Analysis...');
                 sendQualityAnalysisRequest(videoId, (response) => {
                     console.log('[PARALLEL] Quality Analysis response received');
@@ -872,10 +752,21 @@
                         const data = response.data.analysis;
                         console.log('Quality analysis received:', data);
                         
+                        // Load tags FIRST (moved to top)
+                        if (data.content_tags && data.content_tags.length > 0) {
+                            renderTags(data.content_tags);
+                            document.getElementById('tags-section').style.display = 'block';
+                        }
+                        
+                        // Load summary SECOND (new field, right after tags)
+                        if (data.summary) {
+                            renderSummary(data.summary);
+                            document.getElementById('summary-section').style.display = 'block';
+                        }
+                        
                         // Load credibility score
                         if (window.ytaProgressBar && data.credibility_score !== undefined) {
                             window.ytaProgressBar.animate(data.credibility_score);
-                            // Show the credibility score section
                             document.getElementById('credibility-score-section').style.display = 'block';
                         }
                         
@@ -892,12 +783,6 @@
                         if (data.key_insights && data.key_insights.length > 0) {
                             renderKeyInsights(data.key_insights);
                             document.getElementById('key-insights-section').style.display = 'block';
-                        }
-                        
-                        // Load tags
-                        if (data.content_tags && data.content_tags.length > 0) {
-                            renderTags(data.content_tags);
-                            document.getElementById('tags-section').style.display = 'block';
                         }
                         
                         // Load misinformation and quality scores
@@ -940,8 +825,6 @@
                 });
                 
                 console.log('All 3 API calls launched in parallel');
-                
-                // ==================== END 3 INDEPENDENT API CALLS ====================
             });
             
         } catch (err) {
@@ -958,15 +841,11 @@
     const clearBtn = document.getElementById('yta-clear');
 
     clearBtn.addEventListener('click', () => {
-        // Confirm before clearing
         if (!confirm('Are you sure you want to clear the current analysis?')) {
             return;
         }
         
-        // Hide clear button
         clearBtn.style.display = 'none';
-        
-        // Show analyze button
         analyzeBtn.style.display = 'block';
         analyzeBtn.disabled = false;
         analyzeBtn.style.opacity = '1';
@@ -974,6 +853,8 @@
         analyzeBtn.textContent = 'Analyze Video';
         
         // Clear all sections
+        document.getElementById('tags-section').style.display = 'none';
+        document.getElementById('summary-section').style.display = 'none';
         document.getElementById('credibility-score-section').style.display = 'none';
         document.getElementById('clickbait-meter-section').style.display = 'none';
         document.getElementById('comments-analysis-section').style.display = 'none';
@@ -983,16 +864,16 @@
         document.getElementById('bias-distribution-section').style.display = 'none';
         document.getElementById('community-insights-section').style.display = 'none';
         document.getElementById('community-vibe-section').style.display = 'none';
-        document.getElementById('tags-section').style.display = 'none';
         
         // Clear content
+        document.getElementById('tags-content').innerHTML = '';
+        document.getElementById('summary-content').innerHTML = '';
         document.getElementById('fact-check-results').innerHTML = '';
         document.getElementById('key-insights-results').innerHTML = '';
         document.getElementById('alternative-perspectives-results').innerHTML = '';
         document.getElementById('bias-distribution-content').innerHTML = '';
         document.getElementById('community-insights-content').innerHTML = '';
         document.getElementById('community-vibe-content').innerHTML = '';
-        document.getElementById('tags-content').innerHTML = '';
         document.getElementById('comments-analysis-content').innerHTML = '';
         document.getElementById('yta-metrics').innerHTML = '';
         
@@ -1015,7 +896,7 @@
         console.log('Analysis cleared - ready for new analysis');
     });
 
-    // Helper function to send analysis requests (NOW USES video_id)
+    // Helper functions
     function sendAnalysisRequest(type, videoId, callback) {
         try {
             if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
@@ -1049,7 +930,6 @@
         }
     }
 
-    // Helper function to extract video info
     function extractVideoInfo(videoUrl, callback) {
         const FLASK_API_URL = 'http://localhost:5002/extract_video_info';
         
@@ -1087,7 +967,6 @@
         });
     }
 
-    // Helper function to send comments analysis request
     function sendCommentsAnalysisRequest(videoId, callback) {
         const FLASK_API_URL = 'http://localhost:5002/analyze_comments';
         
@@ -1120,7 +999,6 @@
         });
     }
 
-    // Helper function to send quality analysis request
     function sendQualityAnalysisRequest(videoId, callback) {
         const FLASK_API_URL = 'http://localhost:5002/analyze/quality';
         
@@ -1153,13 +1031,11 @@
         });
     }
 
-    // Helper function to update clickbait meter
     function updateClickbaitMeter(score) {
         const scoreValue = document.getElementById('clickbait-score-value');
         const scoreLabel = document.getElementById('clickbait-label');
         const indicator = document.getElementById('clickbait-indicator');
         
-        // Update score display
         let color, label;
         if (score <= 33) {
             color = '#4caf50';
@@ -1175,16 +1051,12 @@
         scoreValue.style.color = color;
         scoreValue.innerHTML = `${score}<span style="font-size: 20px; opacity: 0.7;">/100</span>`;
         scoreLabel.textContent = label;
-        
-        // Update indicator position
         indicator.style.left = `${score}%`;
     }
 
-    // Helper function to update comments analysis
     function updateCommentsAnalysis(positive, neutral, negative) {
         const container = document.getElementById('comments-analysis-content');
         
-        // Ensure percentages add up to 100
         const total = positive + neutral + negative;
         const positivePercent = total > 0 ? Math.round((positive / total) * 100) : 0;
         const neutralPercent = total > 0 ? Math.round((neutral / total) * 100) : 0;
@@ -1274,7 +1146,6 @@
         `;
     }
 
-    // Helper function to render fact checks
     function renderFactChecks(factChecks) {
         const container = document.getElementById('fact-check-results');
         container.innerHTML = '';
@@ -1327,7 +1198,6 @@
         });
     }
 
-    // Helper function to render key insights
     function renderKeyInsights(insights) {
         const container = document.getElementById('key-insights-results');
         container.innerHTML = '<div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 6px;"><ul style="margin: 0; padding-left: 20px; list-style: none;">';
@@ -1358,7 +1228,6 @@
         container.innerHTML += '</ul></div>';
     }
 
-    // Helper function to render alternative perspectives
     function renderAlternativePerspectives(perspectives) {
         const container = document.getElementById('alternative-perspectives-results');
         container.innerHTML = '';
@@ -1412,11 +1281,9 @@
         });
     }
 
-    // Helper function to render community insights
     function renderCommunityInsights(insights) {
         const container = document.getElementById('community-insights-content');
         
-        // Get controversy level color
         const controversyLevel = (insights.controversy_level || '').toLowerCase();
         let controversyColor, controversyBg;
         if (controversyLevel === 'low') {
@@ -1437,7 +1304,6 @@
               border-radius: 6px;
               margin-bottom: 8px;
             ">
-              <!-- Controversy Level Badge -->
               <div style="margin-bottom: 12px;">
                 <div style="
                   display: inline-block;
@@ -1454,7 +1320,6 @@
                 </div>
               </div>
               
-              <!-- Dominant Topic -->
               <div style="margin-bottom: 8px;">
                 <div style="
                   font-size: 11px;
@@ -1472,7 +1337,6 @@
         `;
     }
 
-    // Helper function to render community vibe
     function renderCommunityVibe(vibeText) {
         const container = document.getElementById('community-vibe-content');
         
@@ -1492,22 +1356,18 @@
         `;
     }
 
-    // Helper function to render tags
     function renderTags(tags) {
         const container = document.getElementById('tags-content');
         
-        // Function to generate color from string hash
         function stringToColor(str) {
-            // Simple hash function
             let hash = 0;
             for (let i = 0; i < str.length; i++) {
                 hash = str.charCodeAt(i) + ((hash << 5) - hash);
             }
             
-            // Convert hash to HSL color (keeps saturation and lightness consistent for readability)
             const hue = Math.abs(hash % 360);
-            const saturation = 65 + (Math.abs(hash) % 20); // 65-85%
-            const lightness = 45 + (Math.abs(hash >> 8) % 15); // 45-60%
+            const saturation = 65 + (Math.abs(hash) % 20);
+            const lightness = 45 + (Math.abs(hash >> 8) % 15);
             
             return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
         }
@@ -1536,7 +1396,26 @@
         container.innerHTML = tagsHtml;
     }
 
-    // Helper function to render bias distribution
+    // NEW FUNCTION: Render Summary
+    function renderSummary(summaryText) {
+        const container = document.getElementById('summary-content');
+        
+        container.innerHTML = `
+            <div style="
+              background: rgba(255,255,255,0.05);
+              padding: 14px;
+              border-radius: 6px;
+              border-left: 3px solid #2196f3;
+            ">
+              <div style="
+                font-size: 12px;
+                line-height: 1.6;
+                color: rgba(255,255,255,0.95);
+              ">${escapeHtml(summaryText)}</div>
+            </div>
+        `;
+    }
+
     function renderBiasDistribution(biasData) {
         const container = document.getElementById('bias-distribution-content');
         
@@ -1566,7 +1445,6 @@
               padding: 16px;
               border-radius: 6px;
             ">
-              <!-- Left Leaning -->
               <div style="margin-bottom: 16px;">
                 <div style="
                   display: flex;
@@ -1604,7 +1482,6 @@
                 </div>
               </div>
               
-              <!-- Center/Neutral -->
               <div style="margin-bottom: 16px;">
                 <div style="
                   display: flex;
@@ -1642,7 +1519,6 @@
                 </div>
               </div>
               
-              <!-- Right Leaning -->
               <div style="margin-bottom: 0;">
                 <div style="
                   display: flex;
@@ -1680,7 +1556,6 @@
                 </div>
               </div>
               
-              <!-- Summary Note -->
               <div style="
                 margin-top: 12px;
                 padding-top: 12px;
