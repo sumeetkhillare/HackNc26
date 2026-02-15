@@ -1,5 +1,6 @@
 import os
 import json
+import subprocess
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
@@ -11,6 +12,7 @@ from video_extraction.comment_analyzer import CommentAnalyzer
 from video_extraction.utils.check_video_exits import check_video_exists
 from video_extraction.utils.check_comment_analysis_exists import check_analysis_exists
 from valkey_rest.crud import valkey_get, valkey_set, valkey_delete
+from video_extraction.fact_checker import FactChecker
 
 app = Flask(__name__)
 CORS(app)  # Allow requests from your future frontend
@@ -88,7 +90,7 @@ def extract_video_info():
 
     # 2. RUN TRANSCRIPT CLEANER
     try:
-        if os.path.exists(vtt_path):
+        if vtt_path and os.path.exists(vtt_path):
             # The function now handles the saving internally and returns True/False
             success = clean_vtt(vtt_path, video_id)
 
@@ -107,7 +109,7 @@ def extract_video_info():
     segmented_json_path = os.path.join(
         folder_path, f"{video_id}_segmented_summary.json")
     try:
-        if os.path.exists(vtt_path):
+        if vtt_path and os.path.exists(vtt_path):
             segmenter = TranscriptSegmenter(api_key=GEMINI_API_KEY)
             # This processes the file and saves the JSON to segmented_json_path
             segmenter.process_file(vtt_path, segmented_json_path, video_id=video_id)
@@ -122,6 +124,62 @@ def extract_video_info():
         "message": "Data extracted successfully"
     }), 200
 
+
+@app.route('/analyze/quality', methods=['POST'])
+def analyze_twelve_labs():
+    """
+    Calls the Twelve Labs pipeline using flow.py
+    Usage: Send a POST request to /analyze_twelve_labs
+    """
+    # 1. Define paths relative to the backend folder
+    twelve_folder = os.path.join(os.getcwd(), "twelve")
+    flow_script = os.path.join(twelve_folder, "flow.py")
+    result_json_path = os.path.join(twelve_folder, "result.json")
+
+    print(f"--- Starting Twelve Labs Pipeline ---")
+
+    try:
+
+        log_path = os.path.join(twelve_folder, "pipeline_debug.log")
+
+        with open(log_path, "w") as log_file:
+            process = subprocess.run(
+                ["python", "flow.py", "--all"],
+                cwd=twelve_folder,
+                stdout=log_file,   # Sends normal prints to the file
+                stderr=log_file,   # Sends errors/tracebacks to the file
+                text=True,
+                check=True
+            )
+        print(f"✅ Check {log_path} for full debug details.")
+        # 2. Execute the flow.py script
+        # Using cwd=twelve_folder ensures flow.py can find its local files (upload.py, etc.)
+        # process = subprocess.run(
+        #     ["python", "flow.py", "--all"],
+        #     cwd=twelve_folder,
+        #     capture_output=True,
+        #     text=True,
+        #     check=True
+        # )
+        
+        print("✅ Pipeline execution successful")
+
+        # 3. Read and return the result.json
+        if os.path.exists(result_json_path):
+            with open(result_json_path, 'r', encoding='utf-8') as f:
+                analysis_data = json.load(f)
+                return jsonify(analysis_data), 200
+        else:
+            return jsonify({"error": "result.json not found after analysis"}), 500
+
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Pipeline failed: {e.stderr}")
+        return jsonify({
+            "error": "Twelve Labs pipeline failed",
+            "details": e.stderr
+        }), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/analyze_comments', methods=['POST'])
 def analyze_comments():
@@ -216,6 +274,66 @@ def delete_route(key):
     """
     deleted = valkey_delete(key)
     return jsonify({"deleted": deleted})
+
+@app.route('/fact_check', methods=['POST'])
+def fact_check_video():
+    """
+    Endpoint for fact-checking video claims.
+    Ensures safe response format even if AI or processing fails.
+    """
+    data = request.json
+    video_id = data.get('video_id')
+
+    if not video_id:
+        return jsonify({"error": "No video_id provided"}), 400
+
+    # 1. Setup Paths
+    folder_path = os.path.join(DOWNLOAD_FOLDER, video_id)
+    summary_path = os.path.join(folder_path, f"{video_id}_segmented_summary.json")
+    fact_check_path = os.path.join(folder_path, f"{video_id}_factcheck.json")
+
+    # 2. Check if video folder exists
+    if not os.path.exists(folder_path):
+        return jsonify({"error": "Video not found. Please run extraction first."}), 404
+
+    # 3. Check Cache
+    if os.path.exists(fact_check_path):
+        print(f"Returning cached fact check for {video_id}")
+        try:
+            with open(fact_check_path, 'r', encoding='utf-8') as f:
+                return jsonify(json.load(f)), 200
+        except Exception:
+            pass # Proceed to re-generate if cache is corrupted
+
+    # 4. Check Prerequisites
+    if not os.path.exists(summary_path):
+        return jsonify({
+            "error": "Segmented summary missing. Video likely has no subtitles or summarization failed.",
+            "status": "missing_prerequisite"
+        }), 404
+
+    # 5. Run Fact Checker
+    try:
+        checker = FactChecker()
+        checker.process_video(summary_path, fact_check_path)
+
+        if os.path.exists(fact_check_path):
+            with open(fact_check_path, 'r', encoding='utf-8') as f:
+                return jsonify(json.load(f)), 200
+        else:
+            raise Exception("Output file not created")
+
+    except Exception as e:
+        print(f"[CRITICAL] Fact check endpoint failed: {e}")
+        # Return Safe Empty Response so frontend doesn't crash
+        safe_response = {
+            "fact_checks": [],
+            "alternative_perspectives": [],
+            "bias_distribution": {"left_count": 0, "center_count": 0, "right_count": 0},
+            "status": "error",
+            "reason": f"Server Error: {str(e)}"
+        }
+        return jsonify(safe_response), 500
 
 
 if __name__ == '__main__':
