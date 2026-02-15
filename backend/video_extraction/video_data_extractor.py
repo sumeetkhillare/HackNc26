@@ -139,4 +139,7 @@ def download_and_extract(video_url):
 
     except Exception as e:
         print(f"An error occurred: {e}")
-        return {"status": "error", "message": str(e)}
+
+if __name__ == "__main__":
+    link = "https://www.youtube.com/watch?v=mqXovE-n9EA&t=362s"
+    download_and_analyze(link)
