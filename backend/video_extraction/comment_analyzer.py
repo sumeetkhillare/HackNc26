@@ -11,11 +11,12 @@ import argparse
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 
+from valkey_rest import crud
 from valkey_rest.crud import valkey_get
 
 # --- Configuration ---
 # We use Gemini 2.0 Flash as it is the current standard for new API keys
-DEFAULT_MODEL = "gemini-3-flash-preview" 
+DEFAULT_MODEL = "gemini-3-flash-preview"
 
 # Check for the new Google GenAI SDK
 try:
@@ -25,14 +26,15 @@ try:
 except ImportError:
     GEMINI_AVAILABLE = False
 
+
 class CommentAnalyzer:
     """Analyzes YouTube comments for manipulation and credibility"""
-    
+
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.environ.get('GEMINI_API_KEY')
         self.use_ai = False
         self.client = None
-        
+
         if GEMINI_AVAILABLE and self.api_key:
             try:
                 # NEW SDK Initialization
@@ -41,7 +43,8 @@ class CommentAnalyzer:
                 print(f"[OK] AI mode enabled ({DEFAULT_MODEL})")
             except Exception as e:
                 self.use_ai = False
-                print(f"[!] AI initialization failed: {e}. Switching to fallback.")
+                print(
+                    f"[!] AI initialization failed: {e}. Switching to fallback.")
         else:
             if not GEMINI_AVAILABLE:
                 print("[!] 'google-genai' library not installed. Using fallback.")
@@ -66,7 +69,7 @@ class CommentAnalyzer:
             return "No transcript context available (Video likely has no subtitles)."
 
         segments = transcript_data.get('segments', [])
-        
+
         # EDGE CASE: File exists but has no segments (Empty VTT)
         if not segments:
             return "Transcript is empty (No dialogue detected)."
@@ -75,17 +78,17 @@ class CommentAnalyzer:
         for seg in segments:
             time_range = seg.get('timestamps', {}).get('display', 'Unknown')
             analysis = seg.get('analysis', {})
-            
+
             # EDGE CASE: Handle fallback summary from Segmenter failure
             topic = analysis.get('topic', 'Topic Unknown')
             summary = analysis.get('summary', 'No summary provided.')
-            
+
             # Skip if the segment failed to analyze effectively to reduce noise in prompt
             if topic == "Analysis Unavailable":
                 context_str += f"- [{time_range}] [Raw Text Available, Analysis Failed]\n"
             else:
                 context_str += f"- [{time_range}] {topic}: {summary}\n"
-        
+
         return context_str
 
     def analyze_with_ai(self, video_data: Dict[str, Any], transcript_context: str) -> Dict[str, Any]:
@@ -93,13 +96,13 @@ class CommentAnalyzer:
         comments = video_data.get('comments', [])
         title = video_data.get('title', 'Unknown Video')
         description = video_data.get('description', '')[:500]
-        
+
         if not comments:
             return self._create_empty_analysis("No comments to analyze")
 
         # Analyze a larger sample since we are summarizing metrics
-        comments_text = self._format_comments_for_prompt(comments[:200]) 
-        
+        comments_text = self._format_comments_for_prompt(comments[:200])
+
         prompt = f"""
         Act as an expert Social Media Analyst. Analyze these YouTube comments in the context of the video transcript provided.
 
@@ -157,15 +160,18 @@ class CommentAnalyzer:
     def _analyze_fallback(self, video_data: Dict[str, Any]) -> Dict[str, Any]:
         """Rule-based analysis (No AI required) - Matches new Output Structure"""
         comments = video_data.get('comments', [])
-        
+
         if not comments:
             return self._create_empty_analysis("No comments available")
 
         # 1. Keywords
-        bot_keywords = ['great video', 'nice', 'love it', 'amazing', 'cool', 'wow', 'best', 'promo', 'check my channel']
-        skeptic_keywords = ['fake', 'scam', 'lie', 'false', 'debunk', 'clickbait']
-        positive_keywords = ['love', 'agree', 'good', 'thanks', 'informative', 'lol', 'funny']
-        
+        bot_keywords = ['great video', 'nice', 'love it', 'amazing',
+                        'cool', 'wow', 'best', 'promo', 'check my channel']
+        skeptic_keywords = ['fake', 'scam',
+                            'lie', 'false', 'debunk', 'clickbait']
+        positive_keywords = ['love', 'agree', 'good',
+                             'thanks', 'informative', 'lol', 'funny']
+
         # 2. Counters
         total = len(comments)
         metrics = {
@@ -181,7 +187,7 @@ class CommentAnalyzer:
             # Bot Detection (Simple Heuristic: Short + Generic)
             if t_len < 25 and any(k in text for k in bot_keywords):
                 metrics['bot'] += 1
-            
+
             # Sentiment (Simple Keyword Matching)
             elif any(k in text for k in positive_keywords):
                 metrics['positive'] += 1
@@ -189,15 +195,17 @@ class CommentAnalyzer:
                 metrics['negative'] += 1
             else:
                 metrics['neutral'] += 1
-            
+
         # 3. Calculate Scores
         p_bot = round((metrics['bot'] / total) * 100) if total > 0 else 0
-        
+
         # Engagement Score: Based on length (proxy for depth) and lack of bots
         avg_len = metrics['total_len'] / total if total > 0 else 0
         base_score = 50
-        if avg_len > 50: base_score += 20
-        if avg_len > 100: base_score += 10
+        if avg_len > 50:
+            base_score += 20
+        if avg_len > 100:
+            base_score += 10
         score = max(0, min(100, base_score - p_bot))
 
         return {
@@ -245,12 +253,14 @@ class CommentAnalyzer:
         # CRUD GET 1. Fetch the summary JSON data from Valkey with the key "VIDEO_ID_summary.json"
         video_data = valkey_get(metadata_key)
 
-        print([not video_data, not isinstance(video_data, dict),'comments' not in video_data])
+        print([not video_data, not isinstance(
+            video_data, dict), 'comments' not in video_data])
         # print(type(video_data))
         # print(video_data)
         # --- NEW ROBUST CHECK ---
         if not video_data or not isinstance(video_data, dict) or 'comments' not in video_data:
-            print(f"[!] Warning: Data format issue in {metadata_key}. Normalizing...")
+            print(
+                f"[!] Warning: Data format issue in {metadata_key}. Normalizing...")
             # If it's a list, we wrap it; if empty, we provide defaults
             comments = video_data if isinstance(video_data, list) else []
             video_data = {'id': video_id, 'comments': comments}
@@ -267,7 +277,8 @@ class CommentAnalyzer:
             print("   No Transcript Context provided (running in Context-Blind mode)")
         else:
             print(f"   Formatting Transcript Context: {transcript_key}")
-            transcript_context = self._format_transcript_context(transcript_data)
+            transcript_context = self._format_transcript_context(
+                transcript_data)
 
         # 3. Analyze
         if self.use_ai:
@@ -282,7 +293,7 @@ class CommentAnalyzer:
             "video_id": video_data.get('id', 'unknown'),
             "analyzed_at": datetime.now().isoformat(),
             "context_source": "Transcript + Metadata" if transcript_data else "Metadata Only",
-            "analysis": result # This now contains the clean 4 keys requested
+            "analysis": result  # This now contains the clean 4 keys requested
         }
 
         if not output_path:
@@ -292,5 +303,11 @@ class CommentAnalyzer:
 
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(final_output, f, indent=2, ensure_ascii=False)
+
+        # CRUD PUT 6. Save the _analysis result to Valkey with the key "VIDEO_ID_analysis.json"
+        valkey_key = f"{video_id}_analysis.json"
+        analysis_json = json.dumps(
+            final_output, indent=2, ensure_ascii=False)
+        crud.valkey_set(valkey_key, analysis_json)
 
         print(f"Analysis saved to: {output_path}\n")

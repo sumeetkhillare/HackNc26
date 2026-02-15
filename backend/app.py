@@ -156,7 +156,6 @@ def analyze_twelve_labs():
         except json.JSONDecodeError:
             return jsonify({"error": "Cached analysis is corrupted"}), 500
 
-
     print(f"--- Starting Twelve Labs Pipeline ---")
 
     try:
@@ -223,8 +222,7 @@ def analyze_comments():
 
     if exists:
         print(f"Returning cached analysis for {video_id}")
-        with open(analysis_path, 'r', encoding='utf-8') as f:
-            return jsonify(json.load(f)), 200
+        return jsonify(valkey_get(f"{video_id}_analysis.json")), 200
 
     # 3. Run Analysis if not found
     try:
