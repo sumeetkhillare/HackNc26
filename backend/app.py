@@ -89,7 +89,7 @@ def extract_video_info():
 
     # 2. RUN TRANSCRIPT CLEANER
     try:
-        if os.path.exists(vtt_path):
+        if vtt_path and os.path.exists(vtt_path):
             # The function now handles the saving internally and returns True/False
             success = clean_vtt(vtt_path)
 
@@ -108,7 +108,7 @@ def extract_video_info():
     segmented_json_path = os.path.join(
         folder_path, f"{video_id}_segmented_summary.json")
     try:
-        if os.path.exists(vtt_path):
+        if vtt_path and os.path.exists(vtt_path):
             segmenter = TranscriptSegmenter(api_key=GEMINI_API_KEY)
             # This processes the file and saves the JSON to segmented_json_path
             segmenter.process_file(vtt_path, segmented_json_path)
