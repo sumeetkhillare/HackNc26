@@ -38,7 +38,7 @@ def download_and_analyze(video_url):
         
         # --- Comments ---
         'getcomments': True,
-        'extractor_args': {'youtube': {'max_comments': ['100','all','all','all']}},
+        'extractor_args': {'youtube': {'max_comments': ['250','all','all','all']}},
         
         # --- Clean Up ---
         'quiet': False, 
@@ -79,12 +79,39 @@ def download_and_analyze(video_url):
 
             # Process Comments 
             if info.get('comments'):
-                for comment in info.get('comments'): 
-                    simple_data['comments'].append({
-                        "author": comment.get('author'),
-                        "text": comment.get('text'),
-                        "likes": comment.get('like_count')
-                    })
+                raw_comments = info.get('comments')
+                comment_map = {}
+                root_comments = []
+
+                # 1. First Pass: Create a dictionary of all comments
+                for c in raw_comments:
+                    comment_id = c.get('id')
+                    comment_obj = {
+                        "id": comment_id,
+                        "author": c.get('author'),
+                        "text": c.get('text'),
+                        "likes": c.get('like_count') or 0, # Handle None values
+                        "replies": [] # Prepare a slot for nested replies
+                    }
+                    comment_map[comment_id] = comment_obj
+
+                # 2. Second Pass: Link replies to their parents
+                for c in raw_comments:
+                    current_id = c.get('id')
+                    parent_id = c.get('parent')
+                    
+                    # If it is a top-level comment
+                    if parent_id == 'root':
+                        root_comments.append(comment_map[current_id])
+                    # If it is a reply, and we found its parent
+                    elif parent_id in comment_map:
+                        comment_map[parent_id]['replies'].append(comment_map[current_id])
+
+                # 3. Sort root comments by likes (highest first)
+                root_comments.sort(key=lambda x: x['likes'], reverse=True)
+                
+                # Save the structured tree
+                simple_data['comments'] = root_comments
 
             # C. Save the Simple Data to a clean JSON file
             # We save this as 'VIDEO_ID_summary.json' inside the folder

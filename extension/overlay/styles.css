@@ -36,3 +36,9 @@
     color: #ff8080;
     margin-top: 8px;
 }
+
+#credibility-score {
+    margin: 20px;
+    width: 200px;
+    height: 100px;
+}

@@ -20,6 +20,7 @@
                 "https://www.youtube.com/*"
             ],
             "js": [
+                "progressbar.min.js", 
                 "content.js"
             ],
             "run_at": "document_idle"
