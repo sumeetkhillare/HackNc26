@@ -10,6 +10,7 @@ from video_extraction.compacted_transcript import TranscriptSegmenter
 from video_extraction.comment_analyzer import CommentAnalyzer
 from video_extraction.utils.check_video_exits import check_video_exists
 from video_extraction.utils.check_comment_analysis_exists import check_analysis_exists
+from valkey_rest.crud import ping, get, set, delete
 
 app = Flask(__name__)
 CORS(app)  # Allow requests from your future frontend
@@ -18,6 +19,7 @@ CORS(app)  # Allow requests from your future frontend
 DOWNLOAD_FOLDER = "downloaded_content"
 # Make sure your API Key is set here or in environment variables
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -31,17 +33,18 @@ def check_status():
     Example: /check_status?url=https://youtube.com/...
     """
     video_url = request.args.get('url')
-    
+
     if not video_url:
         return jsonify({"error": "No URL provided"}), 400
-        
+
     exists, video_id = check_video_exists(video_url, DOWNLOAD_FOLDER)
-    
+
     return jsonify({
         "video_id": video_id,
         "processed": exists,
         "folder_path": os.path.join(DOWNLOAD_FOLDER, video_id) if exists else None
     }), 200
+
 
 @app.route('/extract_video_info', methods=['POST'])
 def extract_video_info():
@@ -66,44 +69,43 @@ def extract_video_info():
         }), 200
 
     print(f"--- Starting Pipeline for: {video_url} ---")
-    
 
-
-    ############################################## 1. RUN VIDEO EXTRACTOR
+    # 1. RUN VIDEO EXTRACTOR
     try:
         # This calls your modified function that returns paths
         extraction_result = download_and_extract(video_url)
-        
+
         if extraction_result.get("status") == "error":
             return jsonify({"error": extraction_result.get("message")}), 500
-            
+
         video_id = extraction_result['video_id']
         folder_path = extraction_result['folder_path']
         vtt_path = extraction_result['vtt_file']
         metadata_path = extraction_result['metadata_file']
-        
+
     except Exception as e:
         return jsonify({"error": f"Extraction failed: {str(e)}"}), 500
 
-    ############################################## 2. RUN TRANSCRIPT CLEANER
+    # 2. RUN TRANSCRIPT CLEANER
     try:
         if vtt_path and os.path.exists(vtt_path):
             # The function now handles the saving internally and returns True/False
             success = clean_vtt(vtt_path)
-            
+
             if success:
                 print(f"Transcript cleaned and saved successfully.")
             else:
                 print("Transcript cleaning failed.")
         else:
             print("No VTT file found, skipping cleaning.")
-            
+
     except Exception as e:
         print(f"Warning: Transcript cleaning process threw an error: {e}")
 
-    ############################################## 3. RUN COMPACTED TRANSCRIPT (AI SUMMARIZATION)
+    # 3. RUN COMPACTED TRANSCRIPT (AI SUMMARIZATION)
     # Define output path for the segments
-    segmented_json_path = os.path.join(folder_path, f"{video_id}_segmented_summary.json")
+    segmented_json_path = os.path.join(
+        folder_path, f"{video_id}_segmented_summary.json")
     try:
         if vtt_path and os.path.exists(vtt_path):
             segmenter = TranscriptSegmenter(api_key=GEMINI_API_KEY)
@@ -119,24 +121,25 @@ def extract_video_info():
         "video_id": video_id,
         "message": "Data extracted successfully"
     }), 200
-    
+
 
 @app.route('/analyze_comments', methods=['POST'])
 def analyze_comments():
     data = request.json
     video_id = data.get('video_id')
-    
+
     if not video_id:
         return jsonify({"error": "No video_id provided"}), 400
 
     # 1. Define Paths
     folder_path = os.path.join(DOWNLOAD_FOLDER, video_id)
     metadata_path = os.path.join(folder_path, f"{video_id}_summary.json")
-    vtt_summary_path = os.path.join(folder_path, f"{video_id}_segmented_summary.json")
+    vtt_summary_path = os.path.join(
+        folder_path, f"{video_id}_segmented_summary.json")
     print(folder_path, metadata_path, vtt_summary_path)
     # 2. Check if analysis already exists
     exists, analysis_path = check_analysis_exists(video_id, DOWNLOAD_FOLDER)
-    
+
     if exists:
         print(f"Returning cached analysis for {video_id}")
         with open(analysis_path, 'r', encoding='utf-8') as f:
@@ -146,22 +149,68 @@ def analyze_comments():
     try:
         if not os.path.exists(metadata_path):
             return jsonify({"error": f"Video metadata not found. Run extraction first. {folder_path} {metadata_path}, {vtt_summary_path}"}), 404
-            
+
         analyzer = CommentAnalyzer(api_key=GEMINI_API_KEY)
-        
+
         # Check if we have transcript context to make analysis "Context-Aware"
-        transcript_arg = vtt_summary_path if os.path.exists(vtt_summary_path) else None
-        
+        transcript_arg = vtt_summary_path if os.path.exists(
+            vtt_summary_path) else None
+
         # Run process (saves to analysis_path internally)
-        analyzer.run(metadata_path, transcript_path=transcript_arg, output_path=analysis_path)
-        
+        analyzer.run(metadata_path, transcript_path=transcript_arg,
+                     output_path=analysis_path)
+
         # Load and return the newly created file
         with open(analysis_path, 'r', encoding='utf-8') as f:
             return jsonify(json.load(f)), 200
-            
+
     except Exception as e:
         return jsonify({"error": f"Comment analysis failed: {str(e)}"}), 500
 
+
+@app.route("/ping", methods=["GET"])
+def ping_route():
+    return jsonify({"status": "ok", "valkey": ping()})
+
+
+@app.route("/get/<key>", methods=["GET"])
+def get_route(key):
+    """
+        Sample usage:
+        curl http://localhost:5000/get/key1      
+    """
+    value = get(key)
+    if value is None:
+        return jsonify({"error": "Key not found"}), 404
+    return jsonify({"key": key, "value": value})
+
+
+@app.route("/set/<key>", methods=["PUT", "POST"])
+def set_route(key):
+    """
+        Sample usage:
+        curl -X PUT http://localhost:5000/set/ -H "Content-Type: application/json" -d @C:\D_Drive\CtrlAltElite\backend\data.json
+    """
+
+    value = request.get_json(silent=True)          # entire body = value
+    if value is None:
+        value = request.get_data(as_text=True)     # fallback for plain text
+
+    expire = request.args.get("expire")            # ?expire=3600 in URL
+
+    set(key, value, expire=int(expire) if expire else None)
+
+    return jsonify({"message": "OK", "key": key})
+
+
+@app.route("/delete/<key>", methods=["DELETE"])
+def delete_route(key):
+    """
+        Sample usage:
+        curl -X DELETE http://localhost:5000/delete/key1 
+    """
+    deleted = delete(key)
+    return jsonify({"deleted": deleted})
 
 
 if __name__ == '__main__':

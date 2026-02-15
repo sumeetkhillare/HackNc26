@@ -66,18 +66,25 @@ Return a JSON response with EXACTLY these fields:
 
 {{
   "summary": "A 2-sentence summary of what the video actually contains and discusses",
-  "misinformation": <integer 0-100, where 0=completely factual, 100=completely false>,
-  "overall_credibility": <integer 0-100, where 0=not credible at all, 100=highly credible>,
+  "misinformation_score": <integer 0-100, where 0=completely factual, 100=completely false>,
+  "credibility_score": <integer 0-100, where 0=not credible at all, 100=highly credible>,
   "content_tags": ["category1", "category2", "category3"],
-  "clickbait": "Yes" or "No",
-  "key_claims": "2-sentence description of the main claims or points made in the video"
+  "clickbait_score": <integer 0-100, where 0=not clickbait at all, 100=extreme clickbait>,
+  "key_insights": [
+    {{"text": "insight text here", "severity": "positive"}},
+    {{"text": "another insight", "severity": "caution"}},
+    {{"text": "final insight", "severity": "negative"}}
+  ]
 }}
 
 SCORING GUIDELINES:
-- misinformation: Rate how much false/misleading information is present. Consider if claims match reality.
-- overall_credibility: Rate based on source quality, fact accuracy, presentation style, bias.
+- misinformation_score: Rate how much false/misleading information is present. Consider if claims match reality.
+- credibility_score: Rate based on source quality, fact accuracy, presentation style, bias.
 - content_tags: Choose 2-4 from: ["News", "Politics", "Health", "Technology", "Science", "Sports", "Entertainment", "Education", "Finance", "Weather", "Opinion", "Tutorial", "Review", "Documentary", "Advertisement"]
-- clickbait: "Yes" if title/thumbnail are sensationalized or misleading compared to actual content, "No" if they accurately represent the content.
+- clickbait_score: Rate the level of sensationalism and misleading elements (0=accurate title/thumbnail, 100=extremely misleading)
+- key_insights: List 2-4 key observations about the video. Each insight must have:
+  - "text": Brief insight statement
+  - "severity": One of ["positive", "negative", "caution"]
 
 IMPORTANT: Return ONLY the JSON object, no additional text, explanations, or markdown formatting.
 """
@@ -132,7 +139,8 @@ try:
     parsed_analysis = json.loads(cleaned_summary)
     
     # Validate required fields
-    required_fields = ["summary", "misinformation", "overall_credibility", "content_tags", "clickbait", "key_claims"]
+    required_fields = ["summary", "misinformation_score", "credibility_score", "content_tags", "clickbait_score", "key_insights"]
+    # required_fields = ["summary", "misinformation", "overall_credibility", "content_tags", "clickbait", "key_claims"]
     missing_fields = [field for field in required_fields if field not in parsed_analysis]
     
     if missing_fields:
@@ -144,11 +152,11 @@ except json.JSONDecodeError as e:
     print("Raw response will be saved in 'raw_analysis' field")
     parsed_analysis = {
         "summary": "[Parsing failed - see raw_analysis]",
-        "misinformation": -1,
-        "overall_credibility": -1,
+        "misinformation_score": -1,
+        "credibility_score": -1,
         "content_tags": [],
-        "clickbait": "Unknown",
-        "key_claims": "[Parsing failed - see raw_analysis]",
+        "clickbait_score": -1,
+        "key_insights": [],
         "raw_analysis": summary,
         "_parsing_error": str(e)
     }
@@ -170,12 +178,14 @@ print("="*60)
 if isinstance(parsed_analysis, dict) and 'summary' in parsed_analysis:
     print(f"\n📝 Summary:")
     print(f"   {parsed_analysis.get('summary', 'N/A')}")
-    print(f"\n⚠️  Misinformation Score: {parsed_analysis.get('misinformation', 'N/A')}/100")
-    print(f"✅ Overall Credibility: {parsed_analysis.get('overall_credibility', 'N/A')}/100")
+    print(f"\n⚠️  Misinformation Score: {parsed_analysis.get('misinformation_score', 'N/A')}/100")
+    print(f"✅ Credibility Score: {parsed_analysis.get('credibility_score', 'N/A')}/100")
     print(f"🏷️  Content Tags: {', '.join(parsed_analysis.get('content_tags', []))}")
-    print(f"🎣 Clickbait: {parsed_analysis.get('clickbait', 'N/A')}")
-    print(f"\n💡 Key Claims:")
-    print(f"   {parsed_analysis.get('key_claims', 'N/A')}")
+    print(f"🎣 Clickbait Score: {parsed_analysis.get('clickbait_score', 'N/A')}/100")
+    print(f"\n💡 Key Insights:")
+    for insight in parsed_analysis.get('key_insights', []):
+        severity_icon = {"positive": "✅", "negative": "❌", "caution": "⚠️"}.get(insight.get('severity', ''), "•")
+        print(f"   {severity_icon} {insight.get('text', 'N/A')} [{insight.get('severity', 'N/A')}]")
 else:
     print(summary)
 print("="*60)

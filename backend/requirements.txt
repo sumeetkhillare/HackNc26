@@ -46,3 +46,6 @@ typing-inspection==0.4.2
 typing_extensions==4.15.0
 urllib3==2.6.3
 yt-dlp==2026.2.4
+redis==7.1.1
+Flask==3.1.2
+flask_cors==6.0.2
