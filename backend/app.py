@@ -11,8 +11,9 @@ from video_extraction.compacted_transcript import TranscriptSegmenter
 from video_extraction.comment_analyzer import CommentAnalyzer
 from video_extraction.utils.check_video_exits import check_video_exists
 from video_extraction.utils.check_comment_analysis_exists import check_analysis_exists
-from valkey_rest.crud import valkey_get, valkey_set, valkey_delete
+from valkey_rest.crud import valkey_get, valkey_set, valkey_delete, valkey_exists
 from video_extraction.fact_checker import FactChecker
+
 
 app = Flask(__name__)
 CORS(app)  # Allow requests from your future frontend
@@ -135,6 +136,24 @@ def analyze_twelve_labs():
     twelve_folder = os.path.join(os.getcwd(), "twelve")
     flow_script = os.path.join(twelve_folder, "flow.py")
     result_json_path = os.path.join(twelve_folder, "result.json")
+
+    data = request.json
+    db_id = data.get('video_id')
+
+    valkey_key = f"{db_id}_twelve_analysis.json"
+
+    # 3. Use the existing 'get' function from your teammate's crud.py
+    # If it returns None, the key does not exist
+    exists = valkey_exists(valkey_key) is not None
+
+    if exists:
+        print(f"Returning cached analysis for {db_id}")
+        cached_result = valkey_get(valkey_key)
+        try:
+            return jsonify(json.loads(cached_result)), 200
+        except json.JSONDecodeError:
+            return jsonify({"error": "Cached analysis is corrupted"}), 500
+
 
     print(f"--- Starting Twelve Labs Pipeline ---")
 

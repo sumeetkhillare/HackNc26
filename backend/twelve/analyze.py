@@ -7,6 +7,7 @@ Outputs: result.json
 import requests
 import json
 import os
+from HackNc26.backend import valkey_rest
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -166,8 +167,22 @@ analysis_results = {
     "analysis": parsed_analysis
 }
 
+with open('video_info.json', 'r', encoding='utf-8') as f:
+    data = json.load(f)
+
+# 2. Get the full path from the json
+video_path = data.get("video_file")
+
+# 3. Extract the ID (filename without extension)
+db_id = os.path.splitext(os.path.basename(video_path))[0]
+
+print(f"Detected db_id: {db_id}")
+
 with open('result.json', 'w', encoding='utf-8') as f:
     json.dump(analysis_results, f, indent=2, ensure_ascii=False)
+
+twelve_apps_result_key = db_id + "_twelve_analysis.json"
+valkey_rest.crud.set(twelve_apps_result_key, json.dump(analysis_results, indent=2, ensure_ascii=False))
 
 print(f" Results saved to result.json")
 
