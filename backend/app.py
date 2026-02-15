@@ -8,7 +8,8 @@ from video_extraction.video_data_extractor import download_and_extract
 from video_extraction.clean_transcript import clean_vtt
 from video_extraction.compacted_transcript import TranscriptSegmenter
 from video_extraction.comment_analyzer import CommentAnalyzer
-from video_extraction.utils import check_video_exists
+from video_extraction.utils.check_video_exits import check_video_exists
+from video_extraction.utils.check_comment_analysis_exists import check_analysis_exists
 
 app = Flask(__name__)
 CORS(app)  # Allow requests from your future frontend
@@ -114,24 +115,54 @@ def extract_video_info():
     except Exception as e:
         print(f"Warning: Summarization failed: {e}")
 
-    # # 4. RUN COMMENT ANALYZER (AI)
-    # # Define output path for analysis
-    # analysis_json_path = os.path.join(folder_path, f"{video_id}_analysis.json")
-    # try:
-    #     analyzer = CommentAnalyzer(api_key=GEMINI_API_KEY)
-    #     # We pass the metadata (comments) and the segmented transcript (context)
-    #     # Note: If summarization failed/skipped, segmented_json_path might not exist.
-    #     transcript_arg = segmented_json_path if os.path.exists(segmented_json_path) else None
-        
-    #     analyzer.run(metadata_path, transcript_path=transcript_arg, output_path=analysis_json_path)
-    # except Exception as e:
-    #     print(f"Warning: Comment analysis failed: {e}")
-
     return jsonify({
         "status": "success",
         "video_id": video_id,
         "message": "Data extracted successfully"
     }), 200
+    
+
+@app.route('/analyze_comments', methods=['POST'])
+def analyze_comments():
+    data = request.json
+    video_id = data.get('video_id')
+    
+    if not video_id:
+        return jsonify({"error": "No video_id provided"}), 400
+
+    # 1. Define Paths
+    folder_path = os.path.join(DOWNLOAD_FOLDER, video_id)
+    metadata_path = os.path.join(folder_path, f"{video_id}_summary.json")
+    vtt_summary_path = os.path.join(folder_path, f"{video_id}_segmented_summary.json")
+    
+    # 2. Check if analysis already exists
+    exists, analysis_path = check_analysis_exists(video_id, DOWNLOAD_FOLDER)
+    
+    if exists:
+        print(f"Returning cached analysis for {video_id}")
+        with open(analysis_path, 'r', encoding='utf-8') as f:
+            return jsonify(json.load(f)), 200
+
+    # 3. Run Analysis if not found
+    try:
+        if not os.path.exists(metadata_path):
+            return jsonify({"error": "Video metadata not found. Run extraction first."}), 404
+            
+        analyzer = CommentAnalyzer(api_key=GEMINI_API_KEY)
+        
+        # Check if we have transcript context to make analysis "Context-Aware"
+        transcript_arg = vtt_summary_path if os.path.exists(vtt_summary_path) else None
+        
+        # Run process (saves to analysis_path internally)
+        analyzer.run(metadata_path, transcript_path=transcript_arg, output_path=analysis_path)
+        
+        # Load and return the newly created file
+        with open(analysis_path, 'r', encoding='utf-8') as f:
+            return jsonify(json.load(f)), 200
+            
+    except Exception as e:
+        return jsonify({"error": f"Comment analysis failed: {str(e)}"}), 500
+
 
 
 if __name__ == '__main__':

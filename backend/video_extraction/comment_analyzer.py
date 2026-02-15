@@ -572,15 +572,16 @@ class CommentAnalyzer:
         
         # 1. Load Video Data (Comments)
         video_data = self.load_json_file(input_path)
-        if not video_data.get('comments'):
-            if isinstance(video_data, list):
-                 print(f"[!] Warning: JSON root is a list. Attempting to parse...")
-                 # Assuming list of videos, take the first one or handle appropriately
-                 # For now, create a dummy wrapper if it's a list
-                 video_data = {'comments': []} 
-            else:
-                 video_data['comments'] = []
         
+        # --- NEW ROBUST CHECK ---
+        if not video_data or not isinstance(video_data, dict) or 'comments' not in video_data:
+            print(f"[!] Warning: Data format issue in {input_path}. Normalizing...")
+            # If it's a list, we wrap it; if empty, we provide defaults
+            comments = video_data if isinstance(video_data, list) else []
+            video_id = os.path.basename(input_path).split('_')[0]
+            video_data = {'id': video_id, 'comments': comments}
+        # ------------------------
+
         print(f"   Loaded {len(video_data.get('comments', []))} comments.")
 
         # 2. Load Transcript Context (if provided)
@@ -617,16 +618,3 @@ class CommentAnalyzer:
             json.dump(final_output, f, indent=2, ensure_ascii=False)
 
         print(f"Analysis saved to: {output_path}\n")
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="YouTube Comment Analyzer")
-    parser.add_argument("input_file", help="Path to video comments JSON file")
-    parser.add_argument("-t", "--transcript", help="Path to segmented transcript JSON file", default=None)
-    parser.add_argument("-o", "--output", help="Path to output JSON file", default=None)
-    parser.add_argument("--key", help="Gemini API Key", default="AIzaSyBw7jgmMmbYy_4L0ErQqgtaozkbcii_DY8")
-    
-    args = parser.parse_args()
-    
-    # Run
-    analyzer = CommentAnalyzer(api_key=args.key)
-    analyzer.run(args.input_file, args.transcript, args.output)
