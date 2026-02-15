@@ -11,6 +11,7 @@ from video_extraction.comment_analyzer import CommentAnalyzer
 from video_extraction.utils.check_video_exits import check_video_exists
 from video_extraction.utils.check_comment_analysis_exists import check_analysis_exists
 from valkey_rest.crud import ping, get, set, delete
+from video_extraction.fact_checker import FactChecker
 
 app = Flask(__name__)
 CORS(app)  # Allow requests from your future frontend
@@ -211,6 +212,66 @@ def delete_route(key):
     """
     deleted = delete(key)
     return jsonify({"deleted": deleted})
+
+@app.route('/fact_check', methods=['POST'])
+def fact_check_video():
+    """
+    Endpoint for fact-checking video claims.
+    Ensures safe response format even if AI or processing fails.
+    """
+    data = request.json
+    video_id = data.get('video_id')
+
+    if not video_id:
+        return jsonify({"error": "No video_id provided"}), 400
+
+    # 1. Setup Paths
+    folder_path = os.path.join(DOWNLOAD_FOLDER, video_id)
+    summary_path = os.path.join(folder_path, f"{video_id}_segmented_summary.json")
+    fact_check_path = os.path.join(folder_path, f"{video_id}_factcheck.json")
+
+    # 2. Check if video folder exists
+    if not os.path.exists(folder_path):
+        return jsonify({"error": "Video not found. Please run extraction first."}), 404
+
+    # 3. Check Cache
+    if os.path.exists(fact_check_path):
+        print(f"Returning cached fact check for {video_id}")
+        try:
+            with open(fact_check_path, 'r', encoding='utf-8') as f:
+                return jsonify(json.load(f)), 200
+        except Exception:
+            pass # Proceed to re-generate if cache is corrupted
+
+    # 4. Check Prerequisites
+    if not os.path.exists(summary_path):
+        return jsonify({
+            "error": "Segmented summary missing. Video likely has no subtitles or summarization failed.",
+            "status": "missing_prerequisite"
+        }), 404
+
+    # 5. Run Fact Checker
+    try:
+        checker = FactChecker()
+        checker.process_video(summary_path, fact_check_path)
+
+        if os.path.exists(fact_check_path):
+            with open(fact_check_path, 'r', encoding='utf-8') as f:
+                return jsonify(json.load(f)), 200
+        else:
+            raise Exception("Output file not created")
+
+    except Exception as e:
+        print(f"[CRITICAL] Fact check endpoint failed: {e}")
+        # Return Safe Empty Response so frontend doesn't crash
+        safe_response = {
+            "fact_checks": [],
+            "alternative_perspectives": [],
+            "bias_distribution": {"left_count": 0, "center_count": 0, "right_count": 0},
+            "status": "error",
+            "reason": f"Server Error: {str(e)}"
+        }
+        return jsonify(safe_response), 500
 
 
 if __name__ == '__main__':
