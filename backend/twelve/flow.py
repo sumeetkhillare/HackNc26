@@ -16,10 +16,10 @@ def run_script(script_name):
     result = subprocess.run(['python', script_name], capture_output=False)
     
     if result.returncode != 0:
-        print(f"\n❌ {script_name} failed with exit code {result.returncode}")
+        print(f"\n {script_name} failed with exit code {result.returncode}")
         sys.exit(1)
     
-    print(f"\n✅ {script_name} completed successfully")
+    print(f"\n {script_name} completed successfully")
 
 def main():
     if len(sys.argv) < 2:
@@ -34,13 +34,13 @@ def main():
     option = sys.argv[1]
     
     if option == '--all':
-        print("🚀 Running full pipeline...")
+        print("Running full pipeline...")
         run_script('video_data_extractor.py')
         run_script('extract_store.py')
         run_script('upload.py')
         run_script('analyze.py')
         print("\n" + "="*60)
-        print("🎉 Full pipeline completed!")
+        print("Full pipeline completed!")
         print("="*60)
         
     elif option == '--download':
@@ -56,7 +56,7 @@ def main():
         run_script('analyze.py')
   
     else:
-        print(f"❌ Unknown option: {option}")
+        print(f"Unknown option: {option}")
         print("Use: --all, --extract, --upload, or --analyze")
         sys.exit(1)
 

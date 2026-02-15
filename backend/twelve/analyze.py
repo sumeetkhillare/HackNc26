@@ -17,16 +17,16 @@ BASE_URL = "https://api.twelvelabs.io/v1.3"
 
 # ========== VALIDATION ==========
 if not API_KEY:
-    print("❌ Error: TWELVELABS_API_KEY not found in .env file!")
+    print(" Error: TWELVELABS_API_KEY not found in .env file!")
     exit(1)
 
 # ========== LOAD VIDEO EXTRACT DATA ==========
 if not os.path.exists('video_extract.json'):
-    print("❌ Error: video_extract.json not found!")
+    print(" Error: video_extract.json not found!")
     print("Please run upload.py first.")
     exit(1)
 
-print("📖 Loading video extract data...")
+print(" Loading video extract data...")
 with open('video_extract.json', 'r', encoding='utf-8') as f:
     video_extract = json.load(f)
 
@@ -35,7 +35,7 @@ VIDEO_TITLE = video_extract.get('video_title')
 THUMBNAIL_TEXT = video_extract.get('thumbnail_data_in_text_form')
 
 if not video_id:
-    print("❌ Error: video_id not found in video_extract.json!")
+    print(" Error: video_id not found in video_extract.json!")
     print("Please run upload.py first to get video_id.")
     exit(1)
 
@@ -44,10 +44,10 @@ if not video_id:
 VIDEO_DESCRIPTION = video_extract.get('video_description', '')
 VIDEO_TAGS = video_extract.get('tags', [])
 
-print(f"📝 Title: {VIDEO_TITLE}")
-print(f"📄 Description: {VIDEO_DESCRIPTION[:100]}..." if VIDEO_DESCRIPTION else "None")
-print(f"🏷️  Tags: {', '.join(VIDEO_TAGS[:5])}..." if VIDEO_TAGS else "None")
-print(f"🖼️  Thumbnail: {THUMBNAIL_TEXT[:50]}..." if THUMBNAIL_TEXT else "None")
+print(f" Title: {VIDEO_TITLE}")
+print(f" Description: {VIDEO_DESCRIPTION[:100]}..." if VIDEO_DESCRIPTION else "None")
+print(f"  Tags: {', '.join(VIDEO_TAGS[:5])}..." if VIDEO_TAGS else "None")
+print(f"  Thumbnail: {THUMBNAIL_TEXT[:50]}..." if THUMBNAIL_TEXT else "None")
 
 # ========== CUSTOM ANALYSIS PROMPT ==========
 ANALYSIS_PROMPT = f"""
@@ -91,7 +91,7 @@ IMPORTANT: Return ONLY the JSON object, no additional text, explanations, or mar
 
 
 # ========== ANALYZE VIDEO ==========
-print("\n🔍 Analyzing video...")
+print("\n Analyzing video...")
 
 analyze_url = f"{BASE_URL}/analyze"
 analyze_headers = {
@@ -108,7 +108,7 @@ analyze_data = {
 response = requests.post(analyze_url, headers=analyze_headers, json=analyze_data)
 
 if response.status_code != 200:
-    print(f"❌ Analysis failed: {response.status_code}")
+    print(f" Analysis failed: {response.status_code}")
     print(response.text)
     exit(1)
 
@@ -117,14 +117,14 @@ summary = result.get('data')
 
 # ========== DISPLAY RESULTS ==========
 print("\n" + "="*60)
-print("📝 ANALYSIS RESULTS")
+print(" ANALYSIS RESULTS")
 print("="*60)
 print(summary)
 print("="*60)
 
 # ========== SAVE TO result.json ==========
 # ========== PARSE AND SAVE TO result.json ==========
-print("\n💾 Parsing and saving analysis results...")
+print("\n Parsing and saving analysis results...")
 
 # Try to parse the JSON response
 try:
@@ -144,11 +144,11 @@ try:
     missing_fields = [field for field in required_fields if field not in parsed_analysis]
     
     if missing_fields:
-        print(f"⚠️  Warning: Missing fields in response: {missing_fields}")
+        print(f"  Warning: Missing fields in response: {missing_fields}")
         parsed_analysis['_parsing_warning'] = f"Missing fields: {missing_fields}"
     
 except json.JSONDecodeError as e:
-    print(f"⚠️  Failed to parse JSON response: {e}")
+    print(f"  Failed to parse JSON response: {e}")
     print("Raw response will be saved in 'raw_analysis' field")
     parsed_analysis = {
         "summary": "[Parsing failed - see raw_analysis]",
@@ -169,25 +169,25 @@ analysis_results = {
 with open('result.json', 'w', encoding='utf-8') as f:
     json.dump(analysis_results, f, indent=2, ensure_ascii=False)
 
-print(f"✅ Results saved to result.json")
+print(f" Results saved to result.json")
 
 # ========== DISPLAY FORMATTED RESULTS ==========
 print("\n" + "="*60)
-print("📊 ANALYSIS RESULTS")
+print("ANALYSIS RESULTS")
 print("="*60)
 if isinstance(parsed_analysis, dict) and 'summary' in parsed_analysis:
-    print(f"\n📝 Summary:")
+    print(f"\n Summary:")
     print(f"   {parsed_analysis.get('summary', 'N/A')}")
-    print(f"\n⚠️  Misinformation Score: {parsed_analysis.get('misinformation_score', 'N/A')}/100")
-    print(f"✅ Credibility Score: {parsed_analysis.get('credibility_score', 'N/A')}/100")
-    print(f"🏷️  Content Tags: {', '.join(parsed_analysis.get('content_tags', []))}")
-    print(f"🎣 Clickbait Score: {parsed_analysis.get('clickbait_score', 'N/A')}/100")
-    print(f"\n💡 Key Insights:")
+    print(f"\n  Misinformation Score: {parsed_analysis.get('misinformation_score', 'N/A')}/100")
+    print(f" Credibility Score: {parsed_analysis.get('credibility_score', 'N/A')}/100")
+    print(f"  Content Tags: {', '.join(parsed_analysis.get('content_tags', []))}")
+    print(f" Clickbait Score: {parsed_analysis.get('clickbait_score', 'N/A')}/100")
+    print(f"\n Key Insights:")
     for insight in parsed_analysis.get('key_insights', []):
-        severity_icon = {"positive": "✅", "negative": "❌", "caution": "⚠️"}.get(insight.get('severity', ''), "•")
+        severity_icon = {"positive": "", "negative": "", "caution": ""}.get(insight.get('severity', ''), "•")
         print(f"   {severity_icon} {insight.get('text', 'N/A')} [{insight.get('severity', 'N/A')}]")
 else:
     print(summary)
 print("="*60)
 
-print(f"\n🎉 Done!")
+print(f"\n Done!")

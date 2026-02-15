@@ -1,5 +1,6 @@
 import os
 import json
+import subprocess
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
@@ -122,6 +123,49 @@ def extract_video_info():
         "message": "Data extracted successfully"
     }), 200
 
+
+@app.route('/analyze/quality', methods=['POST'])
+def analyze_twelve_labs():
+    """
+    Calls the Twelve Labs pipeline using flow.py
+    Usage: Send a POST request to /analyze_twelve_labs
+    """
+    # 1. Define paths relative to the backend folder
+    twelve_folder = os.path.join(os.getcwd(), "twelve")
+    flow_script = os.path.join(twelve_folder, "flow.py")
+    result_json_path = os.path.join(twelve_folder, "result.json")
+
+    print(f"--- Starting Twelve Labs Pipeline ---")
+
+    try:
+        # 2. Execute the flow.py script
+        # Using cwd=twelve_folder ensures flow.py can find its local files (upload.py, etc.)
+        process = subprocess.run(
+            ["python", "flow.py", "--all"],
+            cwd=twelve_folder,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        print("✅ Pipeline execution successful")
+
+        # 3. Read and return the result.json
+        if os.path.exists(result_json_path):
+            with open(result_json_path, 'r', encoding='utf-8') as f:
+                analysis_data = json.load(f)
+                return jsonify(analysis_data), 200
+        else:
+            return jsonify({"error": "result.json not found after analysis"}), 500
+
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Pipeline failed: {e.stderr}")
+        return jsonify({
+            "error": "Twelve Labs pipeline failed",
+            "details": e.stderr
+        }), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/analyze_comments', methods=['POST'])
 def analyze_comments():
