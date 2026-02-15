@@ -10,7 +10,7 @@ from video_extraction.compacted_transcript import TranscriptSegmenter
 from video_extraction.comment_analyzer import CommentAnalyzer
 from video_extraction.utils.check_video_exits import check_video_exists
 from video_extraction.utils.check_comment_analysis_exists import check_analysis_exists
-from valkey_rest.crud import ping, get, set, delete
+from valkey_rest.crud import valkey_get, valkey_set, valkey_delete
 
 app = Flask(__name__)
 CORS(app)  # Allow requests from your future frontend
@@ -90,7 +90,7 @@ def extract_video_info():
     try:
         if os.path.exists(vtt_path):
             # The function now handles the saving internally and returns True/False
-            success = clean_vtt(vtt_path)
+            success = clean_vtt(vtt_path, video_id)
 
             if success:
                 print(f"Transcript cleaned and saved successfully.")
@@ -110,7 +110,7 @@ def extract_video_info():
         if os.path.exists(vtt_path):
             segmenter = TranscriptSegmenter(api_key=GEMINI_API_KEY)
             # This processes the file and saves the JSON to segmented_json_path
-            segmenter.process_file(vtt_path, segmented_json_path)
+            segmenter.process_file(vtt_path, segmented_json_path, video_id=video_id)
         else:
             print("No VTT file found, skipping summarization.")
     except Exception as e:
@@ -134,9 +134,10 @@ def analyze_comments():
     # 1. Define Paths
     folder_path = os.path.join(DOWNLOAD_FOLDER, video_id)
     metadata_path = os.path.join(folder_path, f"{video_id}_summary.json")
-    vtt_summary_path = os.path.join(
-        folder_path, f"{video_id}_segmented_summary.json")
-    print(folder_path, metadata_path, vtt_summary_path)
+    # vtt_summary_path = os.path.join(
+    #     folder_path, f"{video_id}_segmented_summary.json")
+    # print(folder_path, metadata_path, vtt_summary_path)
+
     # 2. Check if analysis already exists
     exists, analysis_path = check_analysis_exists(video_id, DOWNLOAD_FOLDER)
 
@@ -147,18 +148,22 @@ def analyze_comments():
 
     # 3. Run Analysis if not found
     try:
-        if not os.path.exists(metadata_path):
-            return jsonify({"error": f"Video metadata not found. Run extraction first. {folder_path} {metadata_path}, {vtt_summary_path}"}), 404
+        # if not os.path.exists(metadata_path):
+        #     return jsonify({"error": f"Video metadata not found. Run extraction first. {folder_path} {metadata_path}, {vtt_summary_path}"}), 404
+        if valkey_get(video_id + "_summary.json") is None:
+            return jsonify({"error": f"Video metadata not found in Valkey. Run extraction first."}), 404
 
         analyzer = CommentAnalyzer(api_key=GEMINI_API_KEY)
 
         # Check if we have transcript context to make analysis "Context-Aware"
-        transcript_arg = vtt_summary_path if os.path.exists(
-            vtt_summary_path) else None
+        # transcript_arg = vtt_summary_path if os.path.exists(
+        #     vtt_summary_path) else None
 
         # Run process (saves to analysis_path internally)
-        analyzer.run(metadata_path, transcript_path=transcript_arg,
-                     output_path=analysis_path)
+        # analyzer.run(metadata_path, transcript_path=transcript_arg,
+        #              output_path=analysis_path)
+        analyzer.run(video_id,
+                     output_path=analysis_path, input_path=metadata_path)
 
         # Load and return the newly created file
         with open(analysis_path, 'r', encoding='utf-8') as f:
@@ -179,7 +184,7 @@ def get_route(key):
         Sample usage:
         curl http://localhost:5000/get/key1      
     """
-    value = get(key)
+    value = valkey_get(key)
     if value is None:
         return jsonify({"error": "Key not found"}), 404
     return jsonify({"key": key, "value": value})
@@ -198,7 +203,7 @@ def set_route(key):
 
     expire = request.args.get("expire")            # ?expire=3600 in URL
 
-    set(key, value, expire=int(expire) if expire else None)
+    valkey_set(key, value, expire=int(expire) if expire else None)
 
     return jsonify({"message": "OK", "key": key})
 
@@ -209,7 +214,7 @@ def delete_route(key):
         Sample usage:
         curl -X DELETE http://localhost:5000/delete/key1 
     """
-    deleted = delete(key)
+    deleted = valkey_delete(key)
     return jsonify({"deleted": deleted})
 
 

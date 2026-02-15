@@ -22,7 +22,12 @@ def ping() -> bool:
     return r.ping()
 
 
-def get(key: str) -> Any:
+def valkey_exists(key: str) -> bool:
+    """Check if a key exists."""
+    return r.exists(key) == 1
+
+
+def valkey_get(key: str) -> Any:
     """GET a key. Automatically JSON-deserializes when possible."""
     value = r.get(key)
     if value is None:
@@ -33,7 +38,7 @@ def get(key: str) -> Any:
         return value  # fallback for old non-JSON data
 
 
-def set(key: str, value: Any, expire: int | None = None) -> bool:
+def valkey_set(key: str, value: Any, expire: int | None = None) -> bool:
     """SET (or UPDATE) a key.
     - dict, list, int, float, bool → automatically JSON serialized
     - str → stored as-is (no extra quotes)
@@ -52,6 +57,16 @@ def set(key: str, value: Any, expire: int | None = None) -> bool:
     return True
 
 
-def delete(key: str) -> bool:
+def valkey_delete(key: str) -> bool:
     """DELETE a key"""
     return bool(r.delete(key))
+
+
+def vtt_file_to_string(file_path: str) -> str:
+    with open(file_path, "r", encoding="utf-8") as f:
+        return f.read()
+
+
+def vtt_string_to_file(content: str, file_path: str) -> None:
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(content)

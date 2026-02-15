@@ -11,6 +11,8 @@ import argparse
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 
+from valkey_rest.crud import valkey_get
+
 # --- Configuration ---
 # We use Gemini 2.0 Flash as it is the current standard for new API keys
 DEFAULT_MODEL = "gemini-3-flash-preview" 
@@ -222,32 +224,37 @@ class CommentAnalyzer:
             "summary_of_vibe": reason
         }
 
-    def run(self, input_path: str, transcript_path: Optional[str] = None, output_path: Optional[str] = None):
+    def run(self, video_id: str, output_path: Optional[str] = None, input_path: Optional[str] = None):
         """Main execution flow"""
-        print(f"Starting Analysis for: {input_path}")
-        
+
         # 1. Load Video Data (Comments)
-        video_data = self.load_json_file(input_path)
+        metadata_key = video_id + "_summary.json"
+        print(f"Starting Analysis for: {metadata_key}")
+
+        # CRUD GET 1. Fetch the summary JSON data from Valkey with the key "VIDEO_ID_summary.json"
+        video_data = valkey_get(metadata_key)
+
         
         # --- NEW ROBUST CHECK ---
         if not video_data or not isinstance(video_data, dict) or 'comments' not in video_data:
-            print(f"[!] Warning: Data format issue in {input_path}. Normalizing...")
+            print(f"[!] Warning: Data format issue in {metadata_key}. Normalizing...")
             # If it's a list, we wrap it; if empty, we provide defaults
             comments = video_data if isinstance(video_data, list) else []
-            video_id = os.path.basename(input_path).split('_')[0]
             video_data = {'id': video_id, 'comments': comments}
         # ------------------------
 
         print(f"   Loaded {len(video_data.get('comments', []))} comments.")
 
         # 2. Load Transcript Context (if provided)
-        transcript_context = ""
-        if transcript_path:
-            print(f"   Loading Transcript Context: {transcript_path}")
-            transcript_data = self.load_json_file(transcript_path)
-            transcript_context = self._format_transcript_context(transcript_data)
-        else:
+        # CRUD GET 4. Fetch the segmented summary data From Valkey with the key "VIDEO_ID_segmented_summary.json"
+        transcript_key = video_id + "_segmented_summary.json"
+        transcript_data = valkey_get(transcript_key)
+
+        if transcript_data is None:
             print("   No Transcript Context provided (running in Context-Blind mode)")
+        else:
+            print(f"   Formatting Transcript Context: {transcript_key}")
+            transcript_context = self._format_transcript_context(transcript_data)
 
         # 3. Analyze
         if self.use_ai:
@@ -261,7 +268,7 @@ class CommentAnalyzer:
         final_output = {
             "video_id": video_data.get('id', 'unknown'),
             "analyzed_at": datetime.now().isoformat(),
-            "context_source": "Transcript + Metadata" if transcript_path else "Metadata Only",
+            "context_source": "Transcript + Metadata" if transcript_data else "Metadata Only",
             "analysis": result # This now contains the clean 4 keys requested
         }
 
