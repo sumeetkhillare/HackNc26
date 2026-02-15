@@ -38,7 +38,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 // API ENDPOINT 1: Fact-Checking & Alternative Perspectives (NOW USES video_id)
 async function analyzeFactsAndPerspectives(videoId) {
-    const FLASK_API_URL = 'http://localhost:5002/analyze/facts';
+    const FLASK_API_URL = 'http://localhost:5002/fact_check';
     
     try {
         console.log('Calling Facts API:', FLASK_API_URL, 'with video_id:', videoId);
