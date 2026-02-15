@@ -241,6 +241,7 @@
           <div style="
             font-weight: bold;
             font-size: 14px;
+            margin-top: 14px;
             margin-bottom: 12px;
             padding-bottom: 8px;
             border-bottom: 1px solid rgba(255,255,255,0.2);
@@ -455,7 +456,7 @@
             to: { color: '#ED6A5A' },
             step: (state, bar) => {
                 bar.path.setAttribute('stroke', state.color);
-                var value = Math.round(bar.value() * 100);
+                var value = Math.round(bar.value());
                 if (value === 0) {
                     bar.setText('');
                 } else {
@@ -468,7 +469,7 @@
         bar.text.style.fontSize = '2rem';
 
         window.ytaProgressBar = bar;
-        bar.animate(0.0);
+        bar.animate(1.0);
     });
 
     document.body.appendChild(root);
@@ -868,7 +869,7 @@
                 sendQualityAnalysisRequest(videoId, (response) => {
                     console.log('[PARALLEL] Quality Analysis response received');
                     if (response && response.success) {
-                        const data = response.data;
+                        const data = response.data.analysis;
                         console.log('Quality analysis received:', data);
                         
                         // Load credibility score
