@@ -35,7 +35,7 @@ def main():
     
     if option == '--all':
         print("Running full pipeline...")
-        run_script('video_data_extractor.py')
+        run_script('download_autosetup.py')
         run_script('extract_store.py')
         run_script('upload.py')
         run_script('analyze.py')
