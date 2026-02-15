@@ -1,0 +1,23 @@
+# Core Google Generative AI SDK (new version)
+google-genai>=0.2.0
+
+# Flask server
+flask>=3.0.0
+flask-cors>=4.0.0
+
+# YouTube data fetching
+google-api-python-client>=2.100.0
+youtube-transcript-api>=0.6.0
+
+# Data processing
+requests>=2.31.0
+python-dotenv>=1.0.0
+
+# JSON handling (built-in, but listed for completeness)
+# json (built-in)
+# datetime (built-in)
+# typing (built-in)
+
+# Optional: For advanced video processing
+# yt-dlp>=2024.3.10  # If you need video downloading
+# opencv-python>=4.8.0  # If you need video frame analysis
