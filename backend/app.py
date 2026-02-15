@@ -113,7 +113,8 @@ def extract_video_info():
         if vtt_path and os.path.exists(vtt_path):
             segmenter = TranscriptSegmenter(api_key=GEMINI_API_KEY)
             # This processes the file and saves the JSON to segmented_json_path
-            segmenter.process_file(vtt_path, segmented_json_path, video_id=video_id)
+            segmenter.process_file(
+                vtt_path, segmented_json_path, video_id=video_id)
         else:
             print("No VTT file found, skipping summarization.")
     except Exception as e:
@@ -181,7 +182,7 @@ def analyze_twelve_labs():
         #     text=True,
         #     check=True
         # )
-        
+
         print("✅ Pipeline execution successful")
 
         # 3. Read and return the result.json
@@ -200,6 +201,7 @@ def analyze_twelve_labs():
         }), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 @app.route('/analyze_comments', methods=['POST'])
 def analyze_comments():
@@ -295,6 +297,7 @@ def delete_route(key):
     deleted = valkey_delete(key)
     return jsonify({"deleted": deleted})
 
+
 @app.route('/fact_check', methods=['POST'])
 def fact_check_video():
     """
@@ -309,7 +312,8 @@ def fact_check_video():
 
     # 1. Setup Paths
     folder_path = os.path.join(DOWNLOAD_FOLDER, video_id)
-    summary_path = os.path.join(folder_path, f"{video_id}_segmented_summary.json")
+    summary_path = os.path.join(
+        folder_path, f"{video_id}_segmented_summary.json")
     fact_check_path = os.path.join(folder_path, f"{video_id}_factcheck.json")
 
     # 2. Check if video folder exists
@@ -317,29 +321,25 @@ def fact_check_video():
         return jsonify({"error": "Video not found. Please run extraction first."}), 404
 
     # 3. Check Cache
-    if os.path.exists(fact_check_path):
-        print(f"Returning cached fact check for {video_id}")
-        try:
-            with open(fact_check_path, 'r', encoding='utf-8') as f:
-                return jsonify(json.load(f)), 200
-        except Exception:
-            pass # Proceed to re-generate if cache is corrupted
+    # CRUD GET 5: Try to get the fact check result from Valkey with the key "VIDEO_ID_fact_check.json"
+    fact_check_json = valkey_get(video_id + "_fact_check.json")
 
-    # 4. Check Prerequisites
-    if not os.path.exists(summary_path):
-        return jsonify({
-            "error": "Segmented summary missing. Video likely has no subtitles or summarization failed.",
-            "status": "missing_prerequisite"
-        }), 404
-
-    # 5. Run Fact Checker
     try:
-        checker = FactChecker()
-        checker.process_video(summary_path, fact_check_path)
+        if fact_check_json is None:
+            # 4. Check Prerequisites
+            if not os.path.exists(summary_path):
+                return jsonify({
+                    "error": "Segmented summary missing. Video likely has no subtitles or summarization failed.",
+                    "status": "missing_prerequisite"
+                }), 404
 
-        if os.path.exists(fact_check_path):
-            with open(fact_check_path, 'r', encoding='utf-8') as f:
-                return jsonify(json.load(f)), 200
+            # 5. Run Fact Checker
+            checker = FactChecker()
+            fact_check_json = checker.process_video(
+                summary_path, fact_check_path, video_id)
+
+        if fact_check_json is not None:
+            return jsonify(fact_check_json), 200
         else:
             raise Exception("Output file not created")
 

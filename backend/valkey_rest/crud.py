@@ -57,9 +57,14 @@ def valkey_set(key: str, value: Any, expire: int | None = None) -> bool:
     return True
 
 
-def valkey_delete(key: str) -> bool:
+def valkey_delete(video_id: str) -> bool:
     """DELETE a key"""
-    return bool(r.delete(key))
+    delete_list = [video_id + "_clean_transcript.json", video_id + "_segmented_summary.json",
+                   video_id + "_fact_check.json", video_id + "_summary.json", video_id + ".en.vtt"]
+    count = 0
+    for key in delete_list:
+        count += int(r.delete(key))
+    return count
 
 
 def vtt_file_to_string(file_path: str) -> str:
