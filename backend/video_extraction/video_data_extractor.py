@@ -107,4 +107,5 @@ def download_and_analyze(video_url):
 
 if __name__ == "__main__":
     link = "https://www.youtube.com/watch?v=mqXovE-n9EA&t=362s"
+    link = "https://www.youtube.com/watch?v=AmUC4m6w1wo"
     download_and_analyze(link)
