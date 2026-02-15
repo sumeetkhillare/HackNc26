@@ -13,10 +13,10 @@ from dotenv import load_dotenv
 try:
     from transformers import pipeline
     USE_TRANSFORMERS = True
-    print("✅ AI vision available (transformers installed)")
+    print(" AI vision available (transformers installed)")
 except ImportError:
     USE_TRANSFORMERS = False
-    print("⚠️  AI vision not available. Install with: pip install transformers torch")
+    print("  AI vision not available. Install with: pip install transformers torch")
 
 load_dotenv()
 
@@ -28,7 +28,7 @@ def analyze_thumbnail_with_ai(image_path):
         return "[AI vision not available]"
     
     try:
-        print("🤖 Analyzing thumbnail with BLIP AI...")
+        print(" Analyzing thumbnail with BLIP AI...")
         
         from transformers import BlipProcessor, BlipForConditionalGeneration
         import torch
@@ -48,11 +48,11 @@ def analyze_thumbnail_with_ai(image_path):
         out = model.generate(**inputs, max_new_tokens=50)
         description = processor.decode(out[0], skip_special_tokens=True)
         
-        print(f"   ✅ Description: {description}")
+        print(f"    Description: {description}")
         return description
         
     except Exception as e:
-        print(f"⚠️  Error: {e}")
+        print(f"  Error: {e}")
         return f"[Error analyzing thumbnail: {str(e)}]"
 
 def extract_data():
@@ -63,7 +63,7 @@ def extract_data():
     
     # ========== LOAD VIDEO INFO ==========
     if not os.path.exists('video_info.json'):
-        print("❌ Error: video_info.txt not found!")
+        print(" Error: video_info.txt not found!")
         print("Please run upload.py first.")
         exit(1)
     
@@ -78,7 +78,7 @@ def extract_data():
     SUMMARY_FILE_PATH = os.path.join(video_dir, f"{video_name}_summary.json")
     THUMBNAIL_FILE_PATH = os.path.join(video_dir, f"{video_name}.webp")
     
-    print(f"\n📁 Input files:")
+    print(f"\n Input files:")
     print(f"   Summary: {SUMMARY_FILE_PATH}")
     print(f"   Thumbnail: {THUMBNAIL_FILE_PATH}")
     
@@ -98,17 +98,17 @@ def extract_data():
                 video_description = data.get("description", "")
                 tags = data.get("tags", [])
                 
-                print(f"✅ Title: {video_title}")
-                print(f"✅ Description: {video_description[:100]}...")
-                print(f"✅ Tags: {len(tags)} tags found")
+                print(f" Title: {video_title}")
+                print(f" Description: {video_description[:100]}...")
+                print(f" Tags: {len(tags)} tags found")
                 
         except Exception as e:
-            print(f"❌ Failed to read summary JSON: {e}")
+            print(f" Failed to read summary JSON: {e}")
             video_title = "[Error reading summary]"
             video_description = "[Error reading summary]"
             tags = []
     else:
-        print(f"❌ Summary file not found: {SUMMARY_FILE_PATH}")
+        print(f" Summary file not found: {SUMMARY_FILE_PATH}")
         video_title = "[Summary file not found]"
         video_description = "[Summary file not found]"
         tags = []
@@ -121,9 +121,9 @@ def extract_data():
     if os.path.exists(THUMBNAIL_FILE_PATH):
         # Use AI to analyze thumbnail
         thumbnail_data_in_text_form = analyze_thumbnail_with_ai(THUMBNAIL_FILE_PATH)
-        print(f"✅ Thumbnail analyzed")
+        print(f" Thumbnail analyzed")
     else:
-        print(f"❌ Thumbnail file not found: {THUMBNAIL_FILE_PATH}")
+        print(f" Thumbnail file not found: {THUMBNAIL_FILE_PATH}")
         thumbnail_data_in_text_form = "[Thumbnail file not found]"
     
     # ========== CREATE OUTPUT JSON ==========
@@ -140,7 +140,7 @@ def extract_data():
     with open(output_file, 'w', encoding='utf-8') as f:
         json.dump(output_data, f, indent=2, ensure_ascii=False)
     
-    print(f"✅ Output saved to: {output_file}")
+    print(f" Output saved to: {output_file}")
     
     # Display output
     print("\n" + "="*60)
