@@ -2,7 +2,7 @@ import yt_dlp
 import os
 import json
 
-def download_and_analyze(video_url):
+def download_and_extract(video_url):
     # 1. Setup specific folder
     output_path = "downloaded_content"
     if not os.path.exists(output_path):
@@ -128,10 +128,15 @@ def download_and_analyze(video_url):
             print(f"2. Audio: {video_id}.mp3")
             print(f"3. Metadata: {video_id}_summary.json")
             print(f"4. Subs: {video_id}.en.vtt")
+            
+            return {
+                "status": "success",
+                "video_id": video_id,
+                "folder_path": f"{output_path}/{video_id}",
+                "metadata_file": f"{output_path}/{video_id}/{video_id}_summary.json",
+                "vtt_file": f"{output_path}/{video_id}/{video_id}.en.vtt"
+            }
 
     except Exception as e:
         print(f"An error occurred: {e}")
-
-if __name__ == "__main__":
-    link = "https://www.youtube.com/watch?v=mqXovE-n9EA&t=362s"
-    download_and_analyze(link)
+        return {"status": "error", "message": str(e)}

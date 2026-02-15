@@ -36,7 +36,7 @@ class TranscriptSegmenter:
     """Parses VTT, segments by time, and summarizes using Gemini"""
 
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.environ.get('GEMINI_API_KEY')
+        self.api_key = os.environ.get('GEMINI_API_KEY')
         self.use_ai = False
         self.client = None
 
@@ -297,9 +297,3 @@ class TranscriptSegmenter:
             json.dump(final_output, f, indent=2, ensure_ascii=False)
             
         print(f"\n[Success] JSON saved to: {output_path}")
-
-if __name__ == "__main__":
-    input_file = r"C:\Users\Admin\Desktop\Personal\mlh2026\HackNc26\backend\video_extraction\downloaded_content\mqXovE-n9EA\mqXovE-n9EA.en.vtt" # Change this to your file path
-    output_file = "mqXovE-n9EA_segmented_summary.json"
-    segmenter = TranscriptSegmenter(api_key="AIzaSyBw7jgmMmbYy_4L0ErQqgtaozkbcii_DY8")
-    segmenter.process_file(input_file, output_file)
