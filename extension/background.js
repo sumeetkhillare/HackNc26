@@ -1,74 +1,166 @@
-// background.js - Service worker that handles API calls to Flask backend
+// background.js - Service worker that handles 3 independent API calls to Flask backend
 
 console.log('YouTube Video Analysis Extension - Background service worker loaded');
 
 // Listen for messages from content script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.type === 'ANALYZE_VIDEO') {
-        console.log('Received ANALYZE_VIDEO request for:', request.videoUrl);
-        
-        // Call Flask backend
-        analyzeVideo(request.videoUrl)
+    console.log('Received request:', request.type);
+    
+    if (request.type === 'ANALYZE_COMMENTS') {
+        // API Call 1: Comments Analysis
+        analyzeComments(request.videoUrl)
             .then(data => {
-                console.log('Analysis complete:', data);
-                sendResponse({
-                    success: true,
-                    data: data
-                });
+                console.log('Comments analysis complete:', data);
+                sendResponse({ success: true, data: data });
             })
             .catch(error => {
-                console.error('Analysis failed:', error);
-                sendResponse({
-                    success: false,
-                    error: error.message || 'Analysis failed'
-                });
+                console.error('Comments analysis failed:', error);
+                sendResponse({ success: false, error: error.message });
             });
-        
-        // Return true to indicate we'll send response asynchronously
+        return true; // Keep message channel open
+    }
+    
+    if (request.type === 'ANALYZE_FACTS') {
+        // API Call 2: Fact-Checking & Alternative Perspectives
+        analyzeFactsAndPerspectives(request.videoUrl)
+            .then(data => {
+                console.log('Fact-check analysis complete:', data);
+                sendResponse({ success: true, data: data });
+            })
+            .catch(error => {
+                console.error('Fact-check analysis failed:', error);
+                sendResponse({ success: false, error: error.message });
+            });
+        return true;
+    }
+    
+    if (request.type === 'ANALYZE_QUALITY') {
+        // API Call 3: Quality Metrics
+        analyzeQuality(request.videoUrl)
+            .then(data => {
+                console.log('Quality analysis complete:', data);
+                sendResponse({ success: true, data: data });
+            })
+            .catch(error => {
+                console.error('Quality analysis failed:', error);
+                sendResponse({ success: false, error: error.message });
+            });
         return true;
     }
 });
 
-// Function to call Flask backend
-async function analyzeVideo(videoUrl) {
-    // IMPORTANT: Change this to your Flask server URL
-    const FLASK_API_URL = 'http://localhost:5002/analyze';
+// API ENDPOINT 1: Comments Analysis
+async function analyzeComments(videoUrl) {
+    const FLASK_API_URL = 'http://localhost:5002/analyze/comments';
     
     try {
-        console.log('Calling Flask API:', FLASK_API_URL);
-        console.log('Video URL:', videoUrl);
+        console.log('Calling Comments API:', FLASK_API_URL);
         
         const response = await fetch(FLASK_API_URL, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                video_url: videoUrl
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ video_url: videoUrl })
         });
         
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Flask server error response:', errorText);
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         
         const data = await response.json();
-        console.log('Flask response received:', data);
+        console.log('Comments API response:', data);
         
-        // Return the analysis data
-        // Expected format: { credibility_score, clickbait_score, sentiment_counts, etc. }
+        // Expected format:
+        // {
+        //   sentiment_counts: { positive, negative, neutral },
+        //   engagement_metrics: { engagement_score, bot_activity_percentage },
+        //   community_insights: { dominant_topic, controversy_level },
+        //   summary_of_vibe: "..."
+        // }
+        
         return data;
         
     } catch (error) {
-        console.error('Error calling Flask API:', error);
-        
-        // Provide helpful error messages
+        console.error('Error calling Comments API:', error);
         if (error.message.includes('Failed to fetch')) {
-            throw new Error('Cannot connect to Flask server. Make sure it is running on http://localhost:5002');
+            throw new Error('Cannot connect to Flask server (Comments API). Make sure it is running on http://localhost:5002');
+        }
+        throw error;
+    }
+}
+
+// API ENDPOINT 2: Fact-Checking & Alternative Perspectives
+async function analyzeFactsAndPerspectives(videoUrl) {
+    const FLASK_API_URL = 'http://localhost:5002/analyze/facts';
+    
+    try {
+        console.log('Calling Facts API:', FLASK_API_URL);
+        
+        const response = await fetch(FLASK_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ video_url: videoUrl })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
         
+        const data = await response.json();
+        console.log('Facts API response:', data);
+        
+        // Expected format:
+        // {
+        //   fact_checks: [{claim, verdict, explanation}, ...],
+        //   alternative_perspectives: [{source, type, description, url}, ...]
+        // }
+        
+        return data;
+        
+    } catch (error) {
+        console.error('Error calling Facts API:', error);
+        if (error.message.includes('Failed to fetch')) {
+            throw new Error('Cannot connect to Flask server (Facts API). Make sure it is running on http://localhost:5002');
+        }
+        throw error;
+    }
+}
+
+// API ENDPOINT 3: Quality Metrics
+async function analyzeQuality(videoUrl) {
+    const FLASK_API_URL = 'http://localhost:5002/analyze/quality';
+    
+    try {
+        console.log('Calling Quality API:', FLASK_API_URL);
+        
+        const response = await fetch(FLASK_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ video_url: videoUrl })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('Quality API response:', data);
+        
+        // Expected format:
+        // {
+        //   credibility_score: 0.75,
+        //   clickbait_score: 35,
+        //   key_insights: [{text, severity}, ...],
+        //   misinformation_score: 0.3,
+        //   quality_score: 0.9
+        // }
+        
+        return data;
+        
+    } catch (error) {
+        console.error('Error calling Quality API:', error);
+        if (error.message.includes('Failed to fetch')) {
+            throw new Error('Cannot connect to Flask server (Quality API). Make sure it is running on http://localhost:5002');
+        }
         throw error;
     }
 }
