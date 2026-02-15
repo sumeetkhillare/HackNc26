@@ -4,11 +4,19 @@ Reads video_extract.json and analyzes video
 Outputs: result.json
 """
 
-import requests
-import json
-import os
-import valkey_rest.crud as crud
+
+
 from dotenv import load_dotenv
+import json
+import requests
+import sys
+import os
+# Add backend directory to path so we can import valkey_rest
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import valkey_rest.crud as crud
+
+
 
 load_dotenv()
 
@@ -46,7 +54,8 @@ VIDEO_DESCRIPTION = video_extract.get('video_description', '')
 VIDEO_TAGS = video_extract.get('tags', [])
 
 print(f" Title: {VIDEO_TITLE}")
-print(f" Description: {VIDEO_DESCRIPTION[:100]}..." if VIDEO_DESCRIPTION else "None")
+print(
+    f" Description: {VIDEO_DESCRIPTION[:100]}..." if VIDEO_DESCRIPTION else "None")
 print(f"  Tags: {', '.join(VIDEO_TAGS[:5])}..." if VIDEO_TAGS else "None")
 print(f"  Thumbnail: {THUMBNAIL_TEXT[:50]}..." if THUMBNAIL_TEXT else "None")
 
@@ -106,7 +115,8 @@ analyze_data = {
     "stream": False
 }
 
-response = requests.post(analyze_url, headers=analyze_headers, json=analyze_data)
+response = requests.post(
+    analyze_url, headers=analyze_headers, json=analyze_data)
 
 if response.status_code != 200:
     print(f" Analysis failed: {response.status_code}")
@@ -136,18 +146,20 @@ try:
     if cleaned_summary.endswith("```"):
         cleaned_summary = cleaned_summary[:-3]
     cleaned_summary = cleaned_summary.strip()
-    
+
     parsed_analysis = json.loads(cleaned_summary)
-    
+
     # Validate required fields
-    required_fields = ["summary", "misinformation_score", "credibility_score", "content_tags", "clickbait_score", "key_insights"]
+    required_fields = ["summary", "misinformation_score",
+                       "credibility_score", "content_tags", "clickbait_score", "key_insights"]
     # required_fields = ["summary", "misinformation", "overall_credibility", "content_tags", "clickbait", "key_claims"]
-    missing_fields = [field for field in required_fields if field not in parsed_analysis]
-    
+    missing_fields = [
+        field for field in required_fields if field not in parsed_analysis]
+
     if missing_fields:
         print(f"  Warning: Missing fields in response: {missing_fields}")
         parsed_analysis['_parsing_warning'] = f"Missing fields: {missing_fields}"
-    
+
 except json.JSONDecodeError as e:
     print(f"  Failed to parse JSON response: {e}")
     print("Raw response will be saved in 'raw_analysis' field")
@@ -193,14 +205,20 @@ print("="*60)
 if isinstance(parsed_analysis, dict) and 'summary' in parsed_analysis:
     print(f"\n Summary:")
     print(f"   {parsed_analysis.get('summary', 'N/A')}")
-    print(f"\n  Misinformation Score: {parsed_analysis.get('misinformation_score', 'N/A')}/100")
-    print(f" Credibility Score: {parsed_analysis.get('credibility_score', 'N/A')}/100")
-    print(f"  Content Tags: {', '.join(parsed_analysis.get('content_tags', []))}")
-    print(f" Clickbait Score: {parsed_analysis.get('clickbait_score', 'N/A')}/100")
+    print(
+        f"\n  Misinformation Score: {parsed_analysis.get('misinformation_score', 'N/A')}/100")
+    print(
+        f" Credibility Score: {parsed_analysis.get('credibility_score', 'N/A')}/100")
+    print(
+        f"  Content Tags: {', '.join(parsed_analysis.get('content_tags', []))}")
+    print(
+        f" Clickbait Score: {parsed_analysis.get('clickbait_score', 'N/A')}/100")
     print(f"\n Key Insights:")
     for insight in parsed_analysis.get('key_insights', []):
-        severity_icon = {"positive": "", "negative": "", "caution": ""}.get(insight.get('severity', ''), "•")
-        print(f"   {severity_icon} {insight.get('text', 'N/A')} [{insight.get('severity', 'N/A')}]")
+        severity_icon = {"positive": "", "negative": "",
+                         "caution": ""}.get(insight.get('severity', ''), "•")
+        print(
+            f"   {severity_icon} {insight.get('text', 'N/A')} [{insight.get('severity', 'N/A')}]")
 else:
     print(summary)
 print("="*60)
