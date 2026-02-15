@@ -1,5 +1,7 @@
-twelve/video_extract.json
-twelve/video_info.json
+backend/twelve/video_extract.json
+backend/twelve/video_info.json
+backend/twelve/result.json
+backend/twelve/__init__.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -388,9 +388,10 @@
       },
       from: { color: '#4caf50' },
       to: { color: '#ED6A5A' },
+      
       step: (state, bar) => {
         bar.path.setAttribute('stroke', state.color);
-        var value = Math.round(bar.value() * 100);
+        var value = Math.round(bar.value());
         if (value === 0) {
           bar.setText('');
         } else {
