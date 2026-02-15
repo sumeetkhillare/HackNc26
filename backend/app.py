@@ -50,7 +50,6 @@ def extract_video_info():
     1. Download Video Data
     2. Clean Transcript
     3. Segment & Summarize Transcript (AI)
-    4. Analyze Comments (AI)
     """
     data = request.json
     video_url = data.get('url')
@@ -134,7 +133,7 @@ def analyze_comments():
     folder_path = os.path.join(DOWNLOAD_FOLDER, video_id)
     metadata_path = os.path.join(folder_path, f"{video_id}_summary.json")
     vtt_summary_path = os.path.join(folder_path, f"{video_id}_segmented_summary.json")
-    
+    print(folder_path, metadata_path, vtt_summary_path)
     # 2. Check if analysis already exists
     exists, analysis_path = check_analysis_exists(video_id, DOWNLOAD_FOLDER)
     
@@ -146,7 +145,7 @@ def analyze_comments():
     # 3. Run Analysis if not found
     try:
         if not os.path.exists(metadata_path):
-            return jsonify({"error": "Video metadata not found. Run extraction first."}), 404
+            return jsonify({"error": f"Video metadata not found. Run extraction first. {folder_path} {metadata_path}, {vtt_summary_path}"}), 404
             
         analyzer = CommentAnalyzer(api_key=GEMINI_API_KEY)
         
