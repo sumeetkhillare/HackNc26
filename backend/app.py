@@ -144,11 +144,12 @@ def analyze_twelve_labs():
 
     # 3. Use the existing 'get' function from your teammate's crud.py
     # If it returns None, the key does not exist
-    exists = valkey_exists(valkey_key) is not None
+    # exists = valkey_exists(valkey_key) is not None
+    cached_result = valkey_get(valkey_key)
 
-    if exists:
+    if cached_result is not None:
         print(f"Returning cached analysis for {db_id}")
-        cached_result = valkey_get(valkey_key)
+        # cached_result = valkey_get(valkey_key)
         try:
             return jsonify(json.loads(cached_result)), 200
         except json.JSONDecodeError:
