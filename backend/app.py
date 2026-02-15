@@ -138,15 +138,28 @@ def analyze_twelve_labs():
     print(f"--- Starting Twelve Labs Pipeline ---")
 
     try:
+
+        log_path = os.path.join(twelve_folder, "pipeline_debug.log")
+
+        with open(log_path, "w") as log_file:
+            process = subprocess.run(
+                ["python", "flow.py", "--all"],
+                cwd=twelve_folder,
+                stdout=log_file,   # Sends normal prints to the file
+                stderr=log_file,   # Sends errors/tracebacks to the file
+                text=True,
+                check=True
+            )
+        print(f"✅ Check {log_path} for full debug details.")
         # 2. Execute the flow.py script
         # Using cwd=twelve_folder ensures flow.py can find its local files (upload.py, etc.)
-        process = subprocess.run(
-            ["python", "flow.py", "--all"],
-            cwd=twelve_folder,
-            capture_output=True,
-            text=True,
-            check=True
-        )
+        # process = subprocess.run(
+        #     ["python", "flow.py", "--all"],
+        #     cwd=twelve_folder,
+        #     capture_output=True,
+        #     text=True,
+        #     check=True
+        # )
         
         print("✅ Pipeline execution successful")
 
