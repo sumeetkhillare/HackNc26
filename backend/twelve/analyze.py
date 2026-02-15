@@ -7,7 +7,7 @@ Outputs: result.json
 import requests
 import json
 import os
-from HackNc26.backend import valkey_rest
+import valkey_rest.crud as crud
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -182,7 +182,7 @@ with open('result.json', 'w', encoding='utf-8') as f:
     json.dump(analysis_results, f, indent=2, ensure_ascii=False)
 
 twelve_apps_result_key = db_id + "_twelve_analysis.json"
-valkey_rest.crud.set(twelve_apps_result_key, json.dump(analysis_results, indent=2, ensure_ascii=False))
+crud.valkey_set(twelve_apps_result_key, analysis_results)  # expire in 7 days
 
 print(f" Results saved to result.json")
 
