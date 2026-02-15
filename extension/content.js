@@ -101,6 +101,32 @@
         #yta-content::-webkit-scrollbar-thumb:hover {
             background: rgba(255,255,255,0.5);
         }
+        
+        /* Clear button styles */
+        #yta-clear {
+            display: none;
+            width: 100%;
+            padding: 10px;
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+            margin-top: 8px;
+            transition: background 0.2s ease;
+        }
+        
+        #yta-clear:hover {
+            background: #d32f2f;
+        }
+        
+        #yta-clear:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background: #f44336;
+        }
     `;
     document.head.appendChild(styleSheet);
 
@@ -207,6 +233,9 @@
           margin-bottom: 16px;
         ">Analyze Video</button>
         
+        <!-- Clear Analysis Button - Hidden by default -->
+        <button id="yta-clear">Clear Analysis</button>
+        
         <!-- Credibility Score Section - Hidden by default -->
         <div id="credibility-score-section" style="display: none;">
           <div style="
@@ -239,7 +268,7 @@
                 font-size: 36px;
                 font-weight: bold;
                 color: #4caf50;
-              ">35<span style="font-size: 20px; opacity: 0.7;">/100</span></div>
+              ">0<span style="font-size: 20px; opacity: 0.7;">/100</span></div>
               <div id="clickbait-label" style="font-size: 11px; opacity: 0.7; margin-top: 4px;">Low Clickbait</div>
             </div>
             
@@ -256,7 +285,7 @@
               <div id="clickbait-indicator" style="
                 position: absolute;
                 top: 50%;
-                left: 35%;
+                left: 0%;
                 transform: translate(-50%, -50%);
                 width: 12px;
                 height: 12px;
@@ -339,6 +368,20 @@
             border-bottom: 1px solid rgba(255,255,255,0.2);
           ">Alternative Perspectives</div>
           <div id="alternative-perspectives-results">
+            <!-- Will be populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Bias Distribution Section -->
+        <div id="bias-distribution-section" style="margin-top: 16px; display: none;">
+          <div style="
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+          ">Source Bias Distribution</div>
+          <div id="bias-distribution-content">
             <!-- Will be populated dynamically -->
           </div>
         </div>
@@ -594,6 +637,10 @@
         try {
             const metricsEl = document.getElementById('yta-metrics');
             const analyzeBtn = document.getElementById('yta-analyze');
+            const clearBtn = document.getElementById('yta-clear');
+
+            // Hide clear button during analysis
+            clearBtn.style.display = 'none';
 
             // Disable button and show loading state
             analyzeBtn.disabled = true;
@@ -617,7 +664,7 @@
                         margin-top: 12px;
                         font-size: 12px;
                         opacity: 0.7;
-                    ">Starting analysis...</div>
+                    ">Extracting video data...</div>
                 </div>
                 <style>
                     @keyframes spin {
@@ -640,199 +687,261 @@
 
             console.log('Extracted video link for analysis:', videoLink);
 
-            // ==================== 3 INDEPENDENT ASYNC API CALLS ====================
-            
-            let completedCalls = 0;
-            let totalCalls = 3;
-            
-            // Helper to update loading message
-            function updateLoadingMessage(message) {
-                const loadingDiv = metricsEl.querySelector('div[style*="margin-top: 12px"]');
-                if (loadingDiv) {
-                    loadingDiv.textContent = message;
-                }
-            }
-            
-            // Helper to check if all calls completed
-            function checkCompletion() {
-                completedCalls++;
-                if (completedCalls === totalCalls) {
+            // ==================== STEP 1: EXTRACT VIDEO INFO ====================
+            extractVideoInfo(videoLink, (extractionResponse) => {
+                if (!extractionResponse || !extractionResponse.success) {
+                    // Extraction failed - show error and stop
+                    const errorMsg = extractionResponse?.error || 'Video extraction failed';
+                    console.error('Video extraction error:', errorMsg);
+                    
+                    metricsEl.innerHTML = `
+                        <div style="
+                            text-align: center;
+                            padding: 20px;
+                            background: rgba(244, 67, 54, 0.1);
+                            border: 1px solid #f44336;
+                            border-radius: 6px;
+                        ">
+                            <div style="color: #f44336; font-size: 14px; font-weight: bold; margin-bottom: 8px;">
+                                ✗ Extraction Failed
+                            </div>
+                            <div style="font-size: 12px; opacity: 0.8;">
+                                ${escapeHtml(errorMsg)}
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Re-enable button
                     analyzeBtn.disabled = false;
                     analyzeBtn.style.opacity = '1';
                     analyzeBtn.style.cursor = 'pointer';
                     analyzeBtn.textContent = 'Analyze Video';
-                    metricsEl.innerHTML = '<div style="text-align:center;padding:12px;font-size:12px;opacity:0.7">✓ Analysis complete</div>';
+                    return;
                 }
-            }
-            
-            // API CALL 1: Comments Analysis (sentiment, engagement, community insights)
-            updateLoadingMessage('Analyzing comments...');
-            sendAnalysisRequest('ANALYZE_COMMENTS', videoLink, (response) => {
-                if (response && response.success) {
-                    const data = response.data;
-                    console.log('Comments analysis received:', data);
-                    
-                    // Load sentiment counts
-                    if (data.sentiment_counts) {
-                        updateCommentsAnalysis(
-                            data.sentiment_counts.positive || 0,
-                            data.sentiment_counts.neutral || 0,
-                            data.sentiment_counts.negative || 0
-                        );
-                        document.getElementById('comments-analysis-section').style.display = 'block';
+                
+                // Extraction succeeded - get video_id
+                const videoId = extractionResponse.data.video_id;
+                console.log('Video extraction successful. Video ID:', videoId);
+                
+                // ==================== STEP 2: RUN 3 INDEPENDENT ASYNC API CALLS ====================
+                
+                let completedCalls = 0;
+                let totalCalls = 3;
+                
+                // Helper to update loading message
+                function updateLoadingMessage(message) {
+                    const loadingDiv = metricsEl.querySelector('div[style*="margin-top: 12px"]');
+                    if (loadingDiv) {
+                        loadingDiv.textContent = message;
                     }
-                    
-                    // Load engagement metrics
-                    if (data.engagement_metrics) {
-                        metricsEl.innerHTML = '';
+                }
+                
+                // Helper to check if all calls completed
+                function checkCompletion() {
+                    completedCalls++;
+                    console.log(`API call completed (${completedCalls}/${totalCalls})`);
+                    if (completedCalls === totalCalls) {
+                        // Hide analyze button
+                        analyzeBtn.style.display = 'none';
                         
-                        const engagementScore = data.engagement_metrics.engagement_score / 100;
-                        const percentage = Math.round(engagementScore * 100);
+                        // Show clear button
+                        clearBtn.style.display = 'block';
                         
-                        metricsEl.innerHTML += `
-                        <div style="margin-bottom:10px">
-                          <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
-                            <span>Engagement Score</span>
-                            <span style="font-weight:bold">${percentage}%</span>
-                          </div>
-                          <div style="background: #333; height: 6px; border-radius: 3px; overflow: hidden;">
-                            <div style="width: ${percentage}%; height: 6px; background: ${getScoreColor(engagementScore)}; border-radius: 3px; transition: width 0.5s ease;"></div>
-                          </div>
-                        </div>`;
+                        // Update metrics message
+                        metricsEl.innerHTML = '<div style="text-align:center;padding:12px;font-size:12px;opacity:0.7">✓ Analysis complete</div>';
                         
-                        if (data.engagement_metrics.bot_activity_percentage !== undefined) {
-                            const botPercent = data.engagement_metrics.bot_activity_percentage;
-                            const botColor = botPercent > 10 ? '#f44336' : botPercent > 5 ? '#ff9800' : '#4caf50';
+                        console.log('All analyses completed successfully');
+                    }
+                }
+                
+                // Launch all 3 API calls immediately (in parallel)
+                console.log('Launching 3 parallel API calls...');
+                
+                // API CALL 1: Comments Analysis (sentiment, engagement, community insights)
+                console.log('[PARALLEL] Starting Comments Analysis...');
+                updateLoadingMessage('Analyzing comments...');
+                sendCommentsAnalysisRequest(videoId, (response) => {
+                    console.log('[PARALLEL] Comments Analysis response received');
+                    if (response && response.success) {
+                        // NEW FORMAT: Data is nested under 'analysis' key
+                        const data = response.data.analysis || response.data;
+                        console.log('Comments analysis received:', data);
+                        
+                        // Load sentiment counts
+                        if (data.sentiment_counts) {
+                            updateCommentsAnalysis(
+                                data.sentiment_counts.positive || 0,
+                                data.sentiment_counts.neutral || 0,
+                                data.sentiment_counts.negative || 0
+                            );
+                            document.getElementById('comments-analysis-section').style.display = 'block';
+                        }
+                        
+                        // Load engagement metrics
+                        if (data.engagement_metrics) {
+                            metricsEl.innerHTML = '';
+                            
+                            // engagement_score is already 0-100, no need to divide
+                            const engagementScore = data.engagement_metrics.engagement_score;
+                            const percentage = Math.round(engagementScore);
+                            const scoreForColor = engagementScore / 100; // Convert to 0-1 for color function
                             
                             metricsEl.innerHTML += `
                             <div style="margin-bottom:10px">
                               <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
-                                <span>Bot Activity</span>
-                                <span style="font-weight:bold;color:${botColor}">${botPercent}%</span>
+                                <span>Engagement Score</span>
+                                <span style="font-weight:bold">${percentage}%</span>
                               </div>
                               <div style="background: #333; height: 6px; border-radius: 3px; overflow: hidden;">
-                                <div style="width: ${botPercent}%; height: 6px; background: ${botColor}; border-radius: 3px; transition: width 0.5s ease;"></div>
+                                <div style="width: ${percentage}%; height: 6px; background: ${getScoreColor(scoreForColor)}; border-radius: 3px; transition: width 0.5s ease;"></div>
+                              </div>
+                            </div>`;
+                            
+                            if (data.engagement_metrics.bot_activity_percentage !== undefined) {
+                                const botPercent = data.engagement_metrics.bot_activity_percentage;
+                                const botColor = botPercent > 10 ? '#f44336' : botPercent > 5 ? '#ff9800' : '#4caf50';
+                                
+                                metricsEl.innerHTML += `
+                                <div style="margin-bottom:10px">
+                                  <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+                                    <span>Bot Activity</span>
+                                    <span style="font-weight:bold;color:${botColor}">${botPercent}%</span>
+                                  </div>
+                                  <div style="background: #333; height: 6px; border-radius: 3px; overflow: hidden;">
+                                    <div style="width: ${botPercent}%; height: 6px; background: ${botColor}; border-radius: 3px; transition: width 0.5s ease;"></div>
+                                  </div>
+                                </div>`;
+                            }
+                        }
+                        
+                        // Load community insights
+                        if (data.community_insights) {
+                            renderCommunityInsights(data.community_insights);
+                            document.getElementById('community-insights-section').style.display = 'block';
+                        }
+                        
+                        // Load community vibe
+                        if (data.summary_of_vibe) {
+                            renderCommunityVibe(data.summary_of_vibe);
+                            document.getElementById('community-vibe-section').style.display = 'block';
+                        }
+                    } else {
+                        console.error('Comments analysis failed:', response);
+                    }
+                    checkCompletion();
+                });
+                
+                // API CALL 2: Fact Checks & Alternative Perspectives
+                console.log('[PARALLEL] Starting Facts Analysis...');
+                sendAnalysisRequest('ANALYZE_FACTS', videoId, (response) => {
+                    console.log('[PARALLEL] Facts Analysis response received');
+                    if (response && response.success) {
+                        // NEW FORMAT: Data is nested under 'analysis' key
+                        const data = response.data.analysis || response.data;
+                        console.log('Fact-check analysis received:', data);
+                        
+                        // Load fact checks
+                        if (data.fact_checks && data.fact_checks.length > 0) {
+                            renderFactChecks(data.fact_checks);
+                            document.getElementById('fact-check-section').style.display = 'block';
+                        }
+                        
+                        // Load alternative perspectives
+                        if (data.alternative_perspectives && data.alternative_perspectives.length > 0) {
+                            renderAlternativePerspectives(data.alternative_perspectives);
+                            document.getElementById('alternative-perspectives-section').style.display = 'block';
+                        }
+                        
+                        // Load bias distribution
+                        if (data.bias_distribution) {
+                            renderBiasDistribution(data.bias_distribution);
+                            document.getElementById('bias-distribution-section').style.display = 'block';
+                        }
+                    } else {
+                        console.error('Fact-check analysis failed:', response);
+                    }
+                    checkCompletion();
+                });
+                
+                // API CALL 3: Quality Metrics (credibility, clickbait, key insights, etc.)
+                console.log('[PARALLEL] Starting Quality Analysis...');
+                sendQualityAnalysisRequest(videoId, (response) => {
+                    console.log('[PARALLEL] Quality Analysis response received');
+                    if (response && response.success) {
+                        const data = response.data;
+                        console.log('Quality analysis received:', data);
+                        
+                        // Load credibility score
+                        if (window.ytaProgressBar && data.credibility_score !== undefined) {
+                            window.ytaProgressBar.animate(data.credibility_score);
+                            // Show the credibility score section
+                            document.getElementById('credibility-score-section').style.display = 'block';
+                        }
+                        
+                        // Load clickbait meter
+                        if (data.clickbait_score !== undefined) {
+                            const clickbaitScore = typeof data.clickbait_score === 'number' && data.clickbait_score <= 1 
+                                ? Math.round(data.clickbait_score * 100) 
+                                : data.clickbait_score;
+                            updateClickbaitMeter(clickbaitScore);
+                            document.getElementById('clickbait-meter-section').style.display = 'block';
+                        }
+                        
+                        // Load key insights
+                        if (data.key_insights && data.key_insights.length > 0) {
+                            renderKeyInsights(data.key_insights);
+                            document.getElementById('key-insights-section').style.display = 'block';
+                        }
+                        
+                        // Load tags
+                        if (data.tags && data.tags.length > 0) {
+                            renderTags(data.tags);
+                            document.getElementById('tags-section').style.display = 'block';
+                        }
+                        
+                        // Load misinformation and quality scores
+                        const metricsContainer = document.getElementById('yta-metrics');
+                        if (data.misinformation_score !== undefined) {
+                            const score = data.misinformation_score;
+                            const percentage = Math.round(score * 100);
+                            
+                            metricsContainer.innerHTML += `
+                            <div style="margin-bottom:10px">
+                              <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+                                <span>Misinformation Score</span>
+                                <span style="font-weight:bold">${percentage}%</span>
+                              </div>
+                              <div style="background: #333; height: 6px; border-radius: 3px; overflow: hidden;">
+                                <div style="width: ${percentage}%; height: 6px; background: ${getScoreColor(score)}; border-radius: 3px; transition: width 0.5s ease;"></div>
                               </div>
                             </div>`;
                         }
-                    }
-                    
-                    // Load community insights
-                    if (data.community_insights) {
-                        renderCommunityInsights(data.community_insights);
-                        document.getElementById('community-insights-section').style.display = 'block';
-                    }
-                    
-                    // Load community vibe
-                    if (data.summary_of_vibe) {
-                        renderCommunityVibe(data.summary_of_vibe);
-                        document.getElementById('community-vibe-section').style.display = 'block';
-                    }
-                } else {
-                    console.error('Comments analysis failed:', response);
-                }
-                checkCompletion();
-            });
-            
-            // API CALL 2: Fact Checks & Alternative Perspectives
-            updateLoadingMessage('Fact-checking and finding sources...');
-            sendAnalysisRequest('ANALYZE_FACTS', videoLink, (response) => {
-                if (response && response.success) {
-                    const data = response.data;
-                    console.log('Fact-check analysis received:', data);
-                    
-                    // Load fact checks
-                    if (data.fact_checks && data.fact_checks.length > 0) {
-                        renderFactChecks(data.fact_checks);
-                        document.getElementById('fact-check-section').style.display = 'block';
-                    }
-                    
-                    // Load alternative perspectives
-                    if (data.alternative_perspectives && data.alternative_perspectives.length > 0) {
-                        renderAlternativePerspectives(data.alternative_perspectives);
-                        document.getElementById('alternative-perspectives-section').style.display = 'block';
-                    }
-                } else {
-                    console.error('Fact-check analysis failed:', response);
-                }
-                checkCompletion();
-            });
-            
-            // API CALL 3: Other Metrics (credibility, clickbait, key insights, etc.)
-            updateLoadingMessage('Calculating quality metrics...');
-            sendAnalysisRequest('ANALYZE_QUALITY', videoLink, (response) => {
-                if (response && response.success) {
-                    const data = response.data;
-                    console.log('Quality analysis received:', data);
-                    
-                    // Load credibility score
-                    if (window.ytaProgressBar && data.credibility_score !== undefined) {
-                        window.ytaProgressBar.animate(data.credibility_score);
-                        // Show the credibility score section
-                        document.getElementById('credibility-score-section').style.display = 'block';
-                    }
-                    
-                    // Load clickbait meter
-                    if (data.clickbait_score !== undefined) {
-                        const clickbaitScore = typeof data.clickbait_score === 'number' && data.clickbait_score <= 1 
-                            ? Math.round(data.clickbait_score * 100) 
-                            : data.clickbait_score;
-                        updateClickbaitMeter(clickbaitScore);
-                        document.getElementById('clickbait-meter-section').style.display = 'block';
-                    }
-                    
-                    // Load key insights
-                    if (data.key_insights && data.key_insights.length > 0) {
-                        renderKeyInsights(data.key_insights);
-                        document.getElementById('key-insights-section').style.display = 'block';
-                    }
-                    
-                    // Load tags
-                    if (data.tags && data.tags.length > 0) {
-                        renderTags(data.tags);
-                        document.getElementById('tags-section').style.display = 'block';
-                    }
-                    
-                    // Load misinformation and quality scores
-                    const metricsContainer = document.getElementById('yta-metrics');
-                    if (data.misinformation_score !== undefined) {
-                        const score = data.misinformation_score;
-                        const percentage = Math.round(score * 100);
                         
-                        metricsContainer.innerHTML += `
-                        <div style="margin-bottom:10px">
-                          <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
-                            <span>Misinformation Score</span>
-                            <span style="font-weight:bold">${percentage}%</span>
-                          </div>
-                          <div style="background: #333; height: 6px; border-radius: 3px; overflow: hidden;">
-                            <div style="width: ${percentage}%; height: 6px; background: ${getScoreColor(score)}; border-radius: 3px; transition: width 0.5s ease;"></div>
-                          </div>
-                        </div>`;
+                        if (data.quality_score !== undefined) {
+                            const score = data.quality_score;
+                            const percentage = Math.round(score * 100);
+                            
+                            metricsContainer.innerHTML += `
+                            <div style="margin-bottom:10px">
+                              <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+                                <span>Quality Score</span>
+                                <span style="font-weight:bold">${percentage}%</span>
+                              </div>
+                              <div style="background: #333; height: 6px; border-radius: 3px; overflow: hidden;">
+                                <div style="width: ${percentage}%; height: 6px; background: ${getScoreColor(score)}; border-radius: 3px; transition: width 0.5s ease;"></div>
+                              </div>
+                            </div>`;
+                        }
+                    } else {
+                        console.error('Quality analysis failed:', response);
                     }
-                    
-                    if (data.quality_score !== undefined) {
-                        const score = data.quality_score;
-                        const percentage = Math.round(score * 100);
-                        
-                        metricsContainer.innerHTML += `
-                        <div style="margin-bottom:10px">
-                          <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
-                            <span>Quality Score</span>
-                            <span style="font-weight:bold">${percentage}%</span>
-                          </div>
-                          <div style="background: #333; height: 6px; border-radius: 3px; overflow: hidden;">
-                            <div style="width: ${percentage}%; height: 6px; background: ${getScoreColor(score)}; border-radius: 3px; transition: width 0.5s ease;"></div>
-                          </div>
-                        </div>`;
-                    }
-                } else {
-                    console.error('Quality analysis failed:', response);
-                }
-                checkCompletion();
+                    checkCompletion();
+                });
+                
+                console.log('All 3 API calls launched in parallel');
+                
+                // ==================== END 3 INDEPENDENT API CALLS ====================
             });
-            
-            // ==================== END 3 INDEPENDENT API CALLS ====================
             
         } catch (err) {
             console.error('Analyze click handler error:', err, err && err.stack);
@@ -844,12 +953,73 @@
         }
     });
 
-    // Helper function to send analysis requests
-    function sendAnalysisRequest(type, videoUrl, callback) {
+    // Clear Analysis functionality
+    const clearBtn = document.getElementById('yta-clear');
+
+    clearBtn.addEventListener('click', () => {
+        // Confirm before clearing
+        if (!confirm('Are you sure you want to clear the current analysis?')) {
+            return;
+        }
+        
+        // Hide clear button
+        clearBtn.style.display = 'none';
+        
+        // Show analyze button
+        analyzeBtn.style.display = 'block';
+        analyzeBtn.disabled = false;
+        analyzeBtn.style.opacity = '1';
+        analyzeBtn.style.cursor = 'pointer';
+        analyzeBtn.textContent = 'Analyze Video';
+        
+        // Clear all sections
+        document.getElementById('credibility-score-section').style.display = 'none';
+        document.getElementById('clickbait-meter-section').style.display = 'none';
+        document.getElementById('comments-analysis-section').style.display = 'none';
+        document.getElementById('fact-check-section').style.display = 'none';
+        document.getElementById('key-insights-section').style.display = 'none';
+        document.getElementById('alternative-perspectives-section').style.display = 'none';
+        document.getElementById('bias-distribution-section').style.display = 'none';
+        document.getElementById('community-insights-section').style.display = 'none';
+        document.getElementById('community-vibe-section').style.display = 'none';
+        document.getElementById('tags-section').style.display = 'none';
+        
+        // Clear content
+        document.getElementById('fact-check-results').innerHTML = '';
+        document.getElementById('key-insights-results').innerHTML = '';
+        document.getElementById('alternative-perspectives-results').innerHTML = '';
+        document.getElementById('bias-distribution-content').innerHTML = '';
+        document.getElementById('community-insights-content').innerHTML = '';
+        document.getElementById('community-vibe-content').innerHTML = '';
+        document.getElementById('tags-content').innerHTML = '';
+        document.getElementById('comments-analysis-content').innerHTML = '';
+        document.getElementById('yta-metrics').innerHTML = '';
+        
+        // Reset credibility score
+        if (window.ytaProgressBar) {
+            window.ytaProgressBar.animate(0.0);
+        }
+        
+        // Reset clickbait meter
+        const scoreValue = document.getElementById('clickbait-score-value');
+        const scoreLabel = document.getElementById('clickbait-label');
+        const indicator = document.getElementById('clickbait-indicator');
+        if (scoreValue && scoreLabel && indicator) {
+            scoreValue.style.color = '#4caf50';
+            scoreValue.innerHTML = '0<span style="font-size: 20px; opacity: 0.7;">/100</span>';
+            scoreLabel.textContent = 'Low Clickbait';
+            indicator.style.left = '0%';
+        }
+        
+        console.log('Analysis cleared - ready for new analysis');
+    });
+
+    // Helper function to send analysis requests (NOW USES video_id)
+    function sendAnalysisRequest(type, videoId, callback) {
         try {
             if (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function') {
                 try {
-                    const result = chrome.runtime.sendMessage({ type: type, videoUrl: videoUrl }, callback);
+                    const result = chrome.runtime.sendMessage({ type: type, videoId: videoId }, callback);
                     if (result && typeof result.then === 'function' && !callback) {
                         result.then(() => { }).catch(err => console.error('Background sendMessage promise rejected:', err));
                     }
@@ -860,7 +1030,7 @@
             }
 
             if (typeof browser !== 'undefined' && browser.runtime && typeof browser.runtime.sendMessage === 'function') {
-                const p = browser.runtime.sendMessage({ type: type, videoUrl: videoUrl });
+                const p = browser.runtime.sendMessage({ type: type, videoId: videoId });
                 if (callback && p && typeof p.then === 'function') {
                     p.then(callback).catch(err => {
                         console.error('browser.runtime.sendMessage rejected:', err);
@@ -876,6 +1046,110 @@
             console.error('sendAnalysisRequest error:', err);
             if (typeof callback === 'function') callback(null);
         }
+    }
+
+    // Helper function to extract video info
+    function extractVideoInfo(videoUrl, callback) {
+        const FLASK_API_URL = 'http://localhost:5002/extract_video_info';
+        
+        console.log('Calling extract_video_info API:', FLASK_API_URL);
+        
+        fetch(FLASK_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: videoUrl })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Extract video info response:', data);
+            
+            if (data.status === 'success') {
+                callback({ success: true, data: data });
+            } else {
+                callback({ success: false, error: data.error || 'Unknown error' });
+            }
+        })
+        .catch(error => {
+            console.error('Error calling extract_video_info API:', error);
+            let errorMsg = 'Failed to extract video data';
+            if (error.message.includes('Failed to fetch')) {
+                errorMsg = 'Cannot connect to Flask server. Make sure it is running on http://localhost:5002';
+            } else {
+                errorMsg = error.message;
+            }
+            callback({ success: false, error: errorMsg });
+        });
+    }
+
+    // Helper function to send comments analysis request
+    function sendCommentsAnalysisRequest(videoId, callback) {
+        const FLASK_API_URL = 'http://localhost:5002/analyze_comments';
+        
+        console.log('Calling analyze_comments API with video_id:', videoId);
+        
+        fetch(FLASK_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ video_id: videoId })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Comments analysis API response:', data);
+            callback({ success: true, data: data });
+        })
+        .catch(error => {
+            console.error('Error calling analyze_comments API:', error);
+            let errorMsg = 'Failed to analyze comments';
+            if (error.message.includes('Failed to fetch')) {
+                errorMsg = 'Cannot connect to Flask server. Make sure it is running on http://localhost:5002';
+            } else {
+                errorMsg = error.message;
+            }
+            callback({ success: false, error: errorMsg });
+        });
+    }
+
+    // Helper function to send quality analysis request
+    function sendQualityAnalysisRequest(videoId, callback) {
+        const FLASK_API_URL = 'http://localhost:5002/analyze/quality';
+        
+        console.log('Calling analyze/quality API with video_id:', videoId);
+        
+        fetch(FLASK_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ video_id: videoId })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Quality analysis API response:', data);
+            callback({ success: true, data: data });
+        })
+        .catch(error => {
+            console.error('Error calling analyze/quality API:', error);
+            let errorMsg = 'Failed to analyze quality';
+            if (error.message.includes('Failed to fetch')) {
+                errorMsg = 'Cannot connect to Flask server. Make sure it is running on http://localhost:5002';
+            } else {
+                errorMsg = error.message;
+            }
+            callback({ success: false, error: errorMsg });
+        });
     }
 
     // Helper function to update clickbait meter
@@ -1259,6 +1533,167 @@
         
         tagsHtml += '</div>';
         container.innerHTML = tagsHtml;
+    }
+
+    // Helper function to render bias distribution
+    function renderBiasDistribution(biasData) {
+        const container = document.getElementById('bias-distribution-content');
+        
+        const total = (biasData.left_count || 0) + (biasData.center_count || 0) + (biasData.right_count || 0);
+        
+        if (total === 0) {
+            container.innerHTML = `
+                <div style="
+                  background: rgba(255,255,255,0.05);
+                  padding: 12px;
+                  border-radius: 6px;
+                  text-align: center;
+                  font-size: 12px;
+                  opacity: 0.7;
+                ">No bias data available</div>
+            `;
+            return;
+        }
+        
+        const leftPercent = Math.round((biasData.left_count / total) * 100);
+        const centerPercent = Math.round((biasData.center_count / total) * 100);
+        const rightPercent = Math.round((biasData.right_count / total) * 100);
+        
+        container.innerHTML = `
+            <div style="
+              background: rgba(255,255,255,0.05);
+              padding: 16px;
+              border-radius: 6px;
+            ">
+              <!-- Left Leaning -->
+              <div style="margin-bottom: 16px;">
+                <div style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 8px;
+                ">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 12px;">Left Leaning</span>
+                    <span style="
+                      background: rgba(33, 150, 243, 0.2);
+                      color: #2196f3;
+                      padding: 2px 8px;
+                      border-radius: 10px;
+                      font-size: 10px;
+                      font-weight: bold;
+                    ">${biasData.left_count}</span>
+                  </div>
+                  <span style="font-size: 12px; font-weight: bold; color: #2196f3;">${leftPercent}%</span>
+                </div>
+                <div style="
+                  width: 100%;
+                  height: 8px;
+                  background: rgba(255,255,255,0.1);
+                  border-radius: 4px;
+                  overflow: hidden;
+                ">
+                  <div style="
+                    width: ${leftPercent}%;
+                    height: 100%;
+                    background: #2196f3;
+                    border-radius: 4px;
+                    transition: width 0.5s ease;
+                  "></div>
+                </div>
+              </div>
+              
+              <!-- Center/Neutral -->
+              <div style="margin-bottom: 16px;">
+                <div style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 8px;
+                ">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 12px;">Center/Neutral</span>
+                    <span style="
+                      background: rgba(156, 39, 176, 0.2);
+                      color: #9c27b0;
+                      padding: 2px 8px;
+                      border-radius: 10px;
+                      font-size: 10px;
+                      font-weight: bold;
+                    ">${biasData.center_count}</span>
+                  </div>
+                  <span style="font-size: 12px; font-weight: bold; color: #9c27b0;">${centerPercent}%</span>
+                </div>
+                <div style="
+                  width: 100%;
+                  height: 8px;
+                  background: rgba(255,255,255,0.1);
+                  border-radius: 4px;
+                  overflow: hidden;
+                ">
+                  <div style="
+                    width: ${centerPercent}%;
+                    height: 100%;
+                    background: #9c27b0;
+                    border-radius: 4px;
+                    transition: width 0.5s ease;
+                  "></div>
+                </div>
+              </div>
+              
+              <!-- Right Leaning -->
+              <div style="margin-bottom: 0;">
+                <div style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  margin-bottom: 8px;
+                ">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 12px;">Right Leaning</span>
+                    <span style="
+                      background: rgba(255, 87, 34, 0.2);
+                      color: #ff5722;
+                      padding: 2px 8px;
+                      border-radius: 10px;
+                      font-size: 10px;
+                      font-weight: bold;
+                    ">${biasData.right_count}</span>
+                  </div>
+                  <span style="font-size: 12px; font-weight: bold; color: #ff5722;">${rightPercent}%</span>
+                </div>
+                <div style="
+                  width: 100%;
+                  height: 8px;
+                  background: rgba(255,255,255,0.1);
+                  border-radius: 4px;
+                  overflow: hidden;
+                ">
+                  <div style="
+                    width: ${rightPercent}%;
+                    height: 100%;
+                    background: #ff5722;
+                    border-radius: 4px;
+                    transition: width 0.5s ease;
+                  "></div>
+                </div>
+              </div>
+              
+              <!-- Summary Note -->
+              <div style="
+                margin-top: 12px;
+                padding-top: 12px;
+                border-top: 1px solid rgba(255,255,255,0.1);
+                font-size: 11px;
+                opacity: 0.7;
+                text-align: center;
+              ">
+                Based on ${total} source${total !== 1 ? 's' : ''} analyzed
+              </div>
+            </div>
+        `;
+        
+        document.getElementById('bias-distribution-section').style.display = 'block';
     }
 
     function getScoreColor(score) {

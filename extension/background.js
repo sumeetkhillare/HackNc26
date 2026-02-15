@@ -1,4 +1,5 @@
-// background.js - Service worker that handles 3 independent API calls to Flask backend
+// background.js - Service worker that handles 2 independent API calls to Flask backend
+// Note: Comments analysis is now called directly from content.js, not through background.js
 
 console.log('YouTube Video Analysis Extension - Background service worker loaded');
 
@@ -6,23 +7,9 @@ console.log('YouTube Video Analysis Extension - Background service worker loaded
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.log('Received request:', request.type);
     
-    if (request.type === 'ANALYZE_COMMENTS') {
-        // API Call 1: Comments Analysis
-        analyzeComments(request.videoUrl)
-            .then(data => {
-                console.log('Comments analysis complete:', data);
-                sendResponse({ success: true, data: data });
-            })
-            .catch(error => {
-                console.error('Comments analysis failed:', error);
-                sendResponse({ success: false, error: error.message });
-            });
-        return true; // Keep message channel open
-    }
-    
     if (request.type === 'ANALYZE_FACTS') {
-        // API Call 2: Fact-Checking & Alternative Perspectives
-        analyzeFactsAndPerspectives(request.videoUrl)
+        // API Call 1: Fact-Checking & Alternative Perspectives
+        analyzeFactsAndPerspectives(request.videoId)
             .then(data => {
                 console.log('Fact-check analysis complete:', data);
                 sendResponse({ success: true, data: data });
@@ -31,12 +18,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 console.error('Fact-check analysis failed:', error);
                 sendResponse({ success: false, error: error.message });
             });
-        return true;
+        return true; // Keep message channel open
     }
     
     if (request.type === 'ANALYZE_QUALITY') {
-        // API Call 3: Quality Metrics
-        analyzeQuality(request.videoUrl)
+        // API Call 2: Quality Metrics
+        analyzeQuality(request.videoId)
             .then(data => {
                 console.log('Quality analysis complete:', data);
                 sendResponse({ success: true, data: data });
@@ -49,56 +36,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 });
 
-// API ENDPOINT 1: Comments Analysis
-async function analyzeComments(videoUrl) {
-    const FLASK_API_URL = 'http://localhost:5002/analyze/comments';
-    
-    try {
-        console.log('Calling Comments API:', FLASK_API_URL);
-        
-        const response = await fetch(FLASK_API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ video_url: videoUrl })
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log('Comments API response:', data);
-        
-        // Expected format:
-        // {
-        //   sentiment_counts: { positive, negative, neutral },
-        //   engagement_metrics: { engagement_score, bot_activity_percentage },
-        //   community_insights: { dominant_topic, controversy_level },
-        //   summary_of_vibe: "..."
-        // }
-        
-        return data;
-        
-    } catch (error) {
-        console.error('Error calling Comments API:', error);
-        if (error.message.includes('Failed to fetch')) {
-            throw new Error('Cannot connect to Flask server (Comments API). Make sure it is running on http://localhost:5002');
-        }
-        throw error;
-    }
-}
-
-// API ENDPOINT 2: Fact-Checking & Alternative Perspectives
-async function analyzeFactsAndPerspectives(videoUrl) {
+// API ENDPOINT 1: Fact-Checking & Alternative Perspectives (NOW USES video_id)
+async function analyzeFactsAndPerspectives(videoId) {
     const FLASK_API_URL = 'http://localhost:5002/analyze/facts';
     
     try {
-        console.log('Calling Facts API:', FLASK_API_URL);
+        console.log('Calling Facts API:', FLASK_API_URL, 'with video_id:', videoId);
         
         const response = await fetch(FLASK_API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ video_url: videoUrl })
+            body: JSON.stringify({ video_id: videoId })
         });
         
         if (!response.ok) {
@@ -125,17 +73,17 @@ async function analyzeFactsAndPerspectives(videoUrl) {
     }
 }
 
-// API ENDPOINT 3: Quality Metrics
-async function analyzeQuality(videoUrl) {
+// API ENDPOINT 2: Quality Metrics (NOW USES video_id)
+async function analyzeQuality(videoId) {
     const FLASK_API_URL = 'http://localhost:5002/analyze/quality';
     
     try {
-        console.log('Calling Quality API:', FLASK_API_URL);
+        console.log('Calling Quality API:', FLASK_API_URL, 'with video_id:', videoId);
         
         const response = await fetch(FLASK_API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ video_url: videoUrl })
+            body: JSON.stringify({ video_id: videoId })
         });
         
         if (!response.ok) {
@@ -151,7 +99,8 @@ async function analyzeQuality(videoUrl) {
         //   clickbait_score: 35,
         //   key_insights: [{text, severity}, ...],
         //   misinformation_score: 0.3,
-        //   quality_score: 0.9
+        //   quality_score: 0.9,
+        //   tags: ["technology", "AI", "science"]
         // }
         
         return data;
