@@ -39,6 +39,7 @@ def main():
         run_script('extract_store.py')
         run_script('upload.py')
         run_script('analyze.py')
+        run_script('cleanup.py')
         print("\n" + "="*60)
         print("Full pipeline completed!")
         print("="*60)
