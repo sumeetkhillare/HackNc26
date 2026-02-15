@@ -228,9 +228,10 @@ def analyze_comments():
 
     # 3. Run Analysis if not found
     try:
-        # if not os.path.exists(metadata_path):
-        #     return jsonify({"error": f"Video metadata not found. Run extraction first. {folder_path} {metadata_path}, {vtt_summary_path}"}), 404
-        if valkey_get(video_id + "_summary.json") is None:
+        # print("BEFORE GET - Checking Valkey for existing analysis...")
+        summary_get = valkey_get(video_id + "_summary.json")
+        # print("AFTER GET - Valkey response:", "Found summary" if summary_get else "No summary found")
+        if summary_get is None:
             return jsonify({"error": f"Video metadata not found in Valkey. Run extraction first."}), 404
 
         analyzer = CommentAnalyzer(api_key=GEMINI_API_KEY)
@@ -274,7 +275,6 @@ def get_route(key):
 def set_route(key):
     """
         Sample usage:
-        curl -X PUT http://localhost:5000/set/ -H "Content-Type: application/json" -d @C:\D_Drive\CtrlAltElite\backend\data.json
     """
 
     value = request.get_json(silent=True)          # entire body = value

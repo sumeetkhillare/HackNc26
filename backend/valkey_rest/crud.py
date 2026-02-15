@@ -33,7 +33,14 @@ def valkey_get(key: str) -> Any:
     if value is None:
         return None
     try:
-        return json.loads(value)
+        value = json.loads(value)
+
+        # print("GET - ", key, " - value:", str(value)[:55])
+        # print(type(json.loads(value)), " - json.loads(value)")
+        if isinstance(value, str):
+            value = json.loads(value)  # Handle double-encoded strings
+        return value
+    
     except (json.JSONDecodeError, TypeError):
         return value  # fallback for old non-JSON data
 
@@ -48,7 +55,8 @@ def valkey_set(key: str, value: Any, expire: int | None = None) -> bool:
         json_value = "null"
     else:
         json_value = json.dumps(value)
-
+        
+    # print("SET - ", key, " - value: ", str(json_value)[:55])
     r.set(key, json_value)
 
     if expire is not None:
@@ -61,9 +69,9 @@ def valkey_delete(video_id: str) -> bool:
     """DELETE a key"""
     delete_list = [video_id + "_clean_transcript.json", video_id + "_segmented_summary.json",
                    video_id + "_fact_check.json", video_id + "_summary.json", video_id + ".en.vtt"]
-    count = 0
+    count = []
     for key in delete_list:
-        count += int(r.delete(key))
+        count.append(int(r.delete(key)))
     return count
 
 

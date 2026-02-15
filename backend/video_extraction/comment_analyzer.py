@@ -245,7 +245,9 @@ class CommentAnalyzer:
         # CRUD GET 1. Fetch the summary JSON data from Valkey with the key "VIDEO_ID_summary.json"
         video_data = valkey_get(metadata_key)
 
-        
+        print([not video_data, not isinstance(video_data, dict),'comments' not in video_data])
+        # print(type(video_data))
+        # print(video_data)
         # --- NEW ROBUST CHECK ---
         if not video_data or not isinstance(video_data, dict) or 'comments' not in video_data:
             print(f"[!] Warning: Data format issue in {metadata_key}. Normalizing...")
