@@ -184,6 +184,7 @@ with open('video_info.json', 'r', encoding='utf-8') as f:
 
 # 2. Get the full path from the json
 video_path = data.get("video_file")
+print(f"Video file path from video_info.json: {video_path}")
 
 # 3. Extract the ID (filename without extension)
 db_id = os.path.splitext(os.path.basename(video_path))[0]

@@ -6,6 +6,7 @@ Usage: python flow.py [--all | --extract | --upload | --analyze]
 
 import sys
 import subprocess
+import cleanuptupo
 
 
 def run_script(script_name):
@@ -24,6 +25,8 @@ def run_script(script_name):
 
 
 def main():
+    cleanuptupo.cleanup_twelve_labs_files()
+
     if len(sys.argv) < 2:
         print(
             "Usage: python flow.py [--all | --extract | --upload | --analyze]")

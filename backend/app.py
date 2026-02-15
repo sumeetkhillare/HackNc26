@@ -5,6 +5,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 # Import your scripts as modules
+from twelve import cleanuptupo
 from video_extraction.video_data_extractor import download_and_extract
 from video_extraction.clean_transcript import clean_vtt
 from video_extraction.compacted_transcript import TranscriptSegmenter
@@ -150,7 +151,8 @@ def analyze_twelve_labs():
 
     data = request.json
     db_id = data.get('video_id')
-
+    if db_id is not None:
+        cleanuptupo.delete_others(db_id)
     valkey_key = f"{db_id}_twelve_analysis.json"
 
     # 3. Use the existing 'get' function from your teammate's crud.py

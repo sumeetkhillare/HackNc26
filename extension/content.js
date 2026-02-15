@@ -374,7 +374,7 @@
     container.style.width = "180px";
     container.style.height = "100px";
 
-    var bar = new ProgressBar.SemiCircle(container, {
+    window.ytaProgressBar = new ProgressBar.SemiCircle(container, {
       strokeWidth: 6,
       color: '#FFEA82',
       trailColor: '#eee',
@@ -391,20 +391,18 @@
       
       step: (state, bar) => {
         bar.path.setAttribute('stroke', state.color);
-        var value = Math.round(bar.value());
+        var value = Math.round(bar.value() * 100);
         if (value === 0) {
           bar.setText('');
         } else {
-          bar.setText(value);
+          bar.setText(value + ' %');
         }
+
         bar.text.style.color = state.color;
       }
     });
-    bar.text.style.fontFamily = '"Raleway", Helvetica, sans-serif';
-    bar.text.style.fontSize = '2rem';
-
-    window.ytaProgressBar = bar;
-    bar.animate(0.0);
+    window.ytaProgressBar.text.style.fontFamily = '"Raleway", Helvetica, sans-serif';
+    window.ytaProgressBar.text.style.fontSize = '2rem';
   });
 
   document.body.appendChild(root);
@@ -767,7 +765,7 @@
 
             // Load credibility score
             if (window.ytaProgressBar && data.credibility_score !== undefined) {
-              window.ytaProgressBar.animate(data.credibility_score);
+              window.ytaProgressBar.animate(data.credibility_score / 100);
               document.getElementById('credibility-score-section').style.display = 'block';
             }
 

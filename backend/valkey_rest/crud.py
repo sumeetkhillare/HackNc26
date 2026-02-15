@@ -67,7 +67,8 @@ def valkey_set(key: str, value: Any, expire: int | None = None) -> bool:
 
 def valkey_delete(video_id: str) -> bool:
     """DELETE a key"""
-    delete_list = [video_id + "_analysis.json"]
+    delete_list = [video_id + "_clean_transcript.json", video_id + "_segmented_summary.json", video_id + "_fact_check.json",
+                   video_id + "_summary.json", video_id + ".en.vtt", video_id + "_analysis.json"]
     count = []
     for key in delete_list:
         count.append(int(r.delete(key)))

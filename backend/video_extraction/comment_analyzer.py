@@ -219,7 +219,7 @@ class CommentAnalyzer:
                 "bot_activity_percentage": p_bot
             },
             "community_insights": {
-                "dominant_topic": "Unable to determine (AI Unavailable)",
+                "dominant_topic": "No Dominant Topic Detected",
                 "controversy_level": "High" if metrics['negative'] > metrics['positive'] else "Low"
             },
             "summary_of_vibe": "Rule-based analysis performed. Sentiment derived from keywords only."
