@@ -1,0 +1,10 @@
+{
+    "key1": {
+        "value": "world",
+        "expire": 1700000000,
+        "created": {
+            "seconds": 1690000000,
+            "nanoseconds": 0
+        }
+    }
+}
