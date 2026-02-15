@@ -14,9 +14,14 @@ from video_extraction.utils.check_comment_analysis_exists import check_analysis_
 from valkey_rest.crud import valkey_get, valkey_set, valkey_delete, valkey_exists
 from video_extraction.fact_checker import FactChecker
 
+os.environ["PYTHONUTF8"] = "1"
+
 
 app = Flask(__name__)
-CORS(app)  # Allow requests from your future frontend
+
+# Configure CORS with explicit headers for extension compatibility
+CORS(app)
+
 
 # Configuration
 DOWNLOAD_FOLDER = "downloaded_content"
@@ -49,7 +54,7 @@ def check_status():
     }), 200
 
 
-@app.route('/extract_video_info', methods=['POST'])
+@app.route('/extract_video_info', methods=['POST', 'OPTIONS'])
 def extract_video_info():
     """
     Main Pipeline:
@@ -57,6 +62,9 @@ def extract_video_info():
     2. Clean Transcript
     3. Segment & Summarize Transcript (AI)
     """
+    if request.method == 'OPTIONS':
+        return '', 204
+
     data = request.json
     video_url = data.get('url')
 
@@ -127,12 +135,14 @@ def extract_video_info():
     }), 200
 
 
-@app.route('/analyze/quality', methods=['POST'])
+@app.route('/analyze/quality', methods=['POST', 'OPTIONS'])
 def analyze_twelve_labs():
     """
     Calls the Twelve Labs pipeline using flow.py
     Usage: Send a POST request to /analyze_twelve_labs
     """
+    if request.method == 'OPTIONS':
+        return '', 204
     # 1. Define paths relative to the backend folder
     twelve_folder = os.path.join(os.getcwd(), "twelve")
     flow_script = os.path.join(twelve_folder, "flow.py")
@@ -202,8 +212,11 @@ def analyze_twelve_labs():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/analyze_comments', methods=['POST'])
+@app.route('/analyze_comments', methods=['POST', 'OPTIONS'])
 def analyze_comments():
+    if request.method == 'OPTIONS':
+        return '', 204
+
     data = request.json
     video_id = data.get('video_id')
 
@@ -296,12 +309,15 @@ def delete_route(key):
     return jsonify({"deleted": deleted})
 
 
-@app.route('/fact_check', methods=['POST'])
+@app.route('/fact_check', methods=['POST', 'OPTIONS'])
 def fact_check_video():
     """
     Endpoint for fact-checking video claims.
     Ensures safe response format even if AI or processing fails.
     """
+    if request.method == 'OPTIONS':
+        return '', 204
+
     data = request.json
     video_id = data.get('video_id')
 
@@ -341,7 +357,7 @@ def fact_check_video():
                 fact_check_dict = json.loads(fact_check_json)
             else:
                 fact_check_dict = fact_check_json
-                
+
             return jsonify(fact_check_dict), 200
         else:
             raise Exception("Output file not created")
@@ -361,4 +377,4 @@ def fact_check_video():
 
 if __name__ == '__main__':
     # Run the server
-    app.run(debug=True, port=5002)
+    app.run(host="localhost", debug=True, port=5002)

@@ -9,7 +9,7 @@
         "storage"
     ],
     "host_permissions": [
-        "https://your-backend.com/*"
+        "http://localhost:5002/*"
     ],
     "background": {
         "service_worker": "background.js"
@@ -20,7 +20,7 @@
                 "https://www.youtube.com/*"
             ],
             "js": [
-                "progressbar.min.js", 
+                "progressbar.min.js",
                 "content.js"
             ],
             "run_at": "document_idle"
