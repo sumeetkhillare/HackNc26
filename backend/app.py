@@ -337,7 +337,12 @@ def fact_check_video():
                 summary_path, fact_check_path, video_id)
 
         if fact_check_json is not None:
-            return jsonify(fact_check_json), 200
+            if isinstance(fact_check_json, str):
+                fact_check_dict = json.loads(fact_check_json)
+            else:
+                fact_check_dict = fact_check_json
+                
+            return jsonify(fact_check_dict), 200
         else:
             raise Exception("Output file not created")
 
