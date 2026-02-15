@@ -2,7 +2,9 @@ import re
 import os
 import json
 
-def clean_vtt(file_path):
+import valkey_rest
+
+def clean_vtt(file_path, video_id):
     """
     Cleans a VTT file, saves the result as a JSON file in the same directory,
     and returns True if successful, False otherwise.
@@ -56,6 +58,9 @@ def clean_vtt(file_path):
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(output_data, f, indent=4, ensure_ascii=False)
             
+        # CRUD PUT 3. Save the clean trascript data to Valkey with the key "VIDEO_ID_clean_transcript.json"
+        valkey_rest.crud.valkey_set(video_id + "_clean_transcript.json", json.dump(output_data, indent=4, ensure_ascii=False))
+
         print(f"Transcript saved to: {json_path}")
         return True
 

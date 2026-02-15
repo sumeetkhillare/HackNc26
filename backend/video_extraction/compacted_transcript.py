@@ -20,6 +20,8 @@ import math
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 
+import valkey_rest
+
 # --- Configuration ---
 # Using the model specified in your reference
 DEFAULT_MODEL = "gemini-3-flash-preview" 
@@ -223,7 +225,7 @@ class TranscriptSegmenter:
             "entities_mentioned": []
         }
 
-    def process_file(self, input_path: str, output_path: Optional[str] = None):
+    def process_file(self, input_path: str, output_path: Optional[str] = None, video_id: Optional[str] = None):
         """Main processing pipeline"""
         print(f"Processing: {input_path}")
         
@@ -296,4 +298,7 @@ class TranscriptSegmenter:
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(final_output, f, indent=2, ensure_ascii=False)
             
+        # CRUD PUT 4. Save the segmented summary data to Valkey with the key "VIDEO_ID_segmented_summary.json"
+        valkey_rest.crud.valkey_set(video_id + "_segmented_summary.json", json.dumps(final_output, indent=2, ensure_ascii=False))
+
         print(f"\n[Success] JSON saved to: {output_path}")

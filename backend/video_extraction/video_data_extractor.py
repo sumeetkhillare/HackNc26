@@ -2,6 +2,8 @@ import yt_dlp
 import os
 import json
 
+import valkey_rest
+
 def download_and_extract(video_url):
     # 1. Setup specific folder
     output_path = "downloaded_content"
@@ -122,6 +124,9 @@ def download_and_extract(video_url):
             with open(json_filename, 'w', encoding='utf-8') as f:
                 json.dump(simple_data, f, indent=4, ensure_ascii=False)
 
+            # CRUD PUT 1. Save the summary JSON data to Valkey with the key "VIDEO_ID_summary.json"
+            valkey_rest.crud.valkey_set(video_id + "_summary.json", json.dumps(simple_data, indent=4, ensure_ascii=False))
+
             print("\n" + "="*30)
             print("ANALYSIS READY")
             print("="*30)
@@ -131,12 +136,18 @@ def download_and_extract(video_url):
             print(f"3. Metadata: {video_id}_summary.json")
             print(f"4. Subs: {video_id}.en.vtt")
             
+            vtt_file_path = f"{output_path}/{video_id}/{video_id}.en.vtt"
+
+            # CRUD PUT 2. Save the VTT data to Valkey with the key "VIDEO_ID.en.vtt"
+            vtt_content = valkey_rest.crud.vtt_file_to_string(vtt_file_path)
+            valkey_rest.crud.valkey_set(video_id + ".en.vtt", vtt_content)
+
             return {
                 "status": "success",
                 "video_id": video_id,
                 "folder_path": f"{output_path}/{video_id}",
                 "metadata_file": f"{output_path}/{video_id}/{video_id}_summary.json",
-                "vtt_file": f"{output_path}/{video_id}/{video_id}.en.vtt"
+                "vtt_file": vtt_file_path
             }
 
     except Exception as e:
